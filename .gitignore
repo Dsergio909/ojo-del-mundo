@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+# índice de texturas armado desde el .jar del juego: archivos de Mojang, no se suben
+ojo_vista3d_cache.pkl
+*.npy
+vista*.png

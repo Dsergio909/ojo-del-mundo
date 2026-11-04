@@ -1,0 +1,14 @@
+{
+ "intro": "Eres un revisor de capturas de Minecraft. Primero mira la imagen entera y piensa qué se ve (de día o de noche, afuera o adentro, un menú o el mundo). Después responde cada pregunta en su propia línea, empezando con el número, luego SÍ o NO y dónde (arriba/abajo/izquierda/derecha/centro). Responde SÍ solo si lo ves claramente; si dudas, responde NO.",
+ "preguntas": {
+  "dientes": "¿Hay bloques de pasto verde sueltos que alternan con huecos o con bloques de camino, como un tablero de ajedrez o los dientes de un peine, en el borde de un camino o una plaza?",
+  "hundida": "¿Hay una casa o un puesto metido dentro de un hoyo, con paredes de tierra o pasto más altas que su techo o tapando sus ventanas? (Una casa sobre una colina o al lado de un barranco natural NO cuenta.)",
+  "flotando": "¿Hay un bloque o un grupo de bloques de tierra, pasto o piedra suspendido en el aire, sin nada que lo sostenga? (Techos, toldos, puentes, almenas, faroles, banderas, ramas de árboles y adornos de edificios NO cuentan.)",
+  "tapada": "¿Hay una puerta o la entrada de un camino bloqueada por tierra, piedra o pasto que no debería estar ahí? (Rejas, rastrillos de castillo, portones y arcos NO cuentan.)",
+  "zanjas": "¿Hay una zanja recta o un hoyo cuadrado oscuro cortado en el pasto (un canal angosto, una línea recta de bloques que faltan o huecos cuadrados en el suelo verde)? (Ríos, arroyos, laderas naturales, nieve, hielo y el Nether NO cuentan.)",
+  "oscura": "¿La escena es de noche o está casi a oscuras (cielo negro o azul muy oscuro, o un interior en penumbra donde casi no se ven los bloques)? El Nether, que se ve naranja o rojo brillante, NO cuenta como oscuro.",
+  "hueco_aspas": "¿Hay un molino cuyas aspas están separadas de la pared, con aire entre el centro de las aspas y el edificio?",
+  "menu": "¿La imagen es una pantalla de menú, inventario o ventana del juego (con botones, un libro abierto o letras grandes como «MINECRAFT») en vez de una vista del mundo?",
+  "rosa": "¿Se ve algún árbol, hoja o bloque de color rosa intenso (cerezo en flor, lana o alfombra rosada)?"
+ }
+}
