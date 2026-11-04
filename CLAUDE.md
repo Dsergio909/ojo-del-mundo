@@ -26,7 +26,7 @@ La memoria de mis proyectos es mi repo **privado** `Dsergio909/cerebro` (copia d
 - Publicado en GitHub el 4-nov-2026 (MIT). `ver_mundo.py` funciona con cualquier mundo de Minecraft Java 1.21 en Windows, Mac y Linux.
 - El servidor MCP (`ojo/ojo_del_mundo.py`, 32 herramientas) es el mismo que uso en el modpack, tal cual: espera las carpetas `servidor/` y `planos/` y está hecho para Windows.
 - Pruebas: `python pruebas/probar.py` (mundo hecho desde cero, sin Minecraft). GitHub las corre en Windows y Linux en cada cambio. Si cambias cómo se leen o dibujan los bloques, córrelas antes de subir.
-- Por confirmar con fuentes del PC: «7 fotos reales, 83 a 95 % de parecido» en el README.
+- Confirmado (4-nov): «7 fotos reales, 83 a 95 % de parecido» sale de `comparar_foto` con 7 fotos del cliente de prueba (3 de día, plaza y taberna de noche, cripta, taberna de día). Fuente: cerebro, `MC_Herramientas_IAs_y_el_Ojo`, «Calibración con fotos reales (4-nov)».
 
 ## Registro de carrera
 Al cerrar ("cierra el chat") o cuando diga "registra esto", revisa si pasó algo que cumpla al menos uno de estos criterios: terminé o entregué algo, tomé una decisión importante con su razón, obtuve un resultado concreto, aprendí una herramienta usándola de verdad, o algo falló y entendí por qué. Si nada cumple, dime "nada para registrar".
