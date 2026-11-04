@@ -6,7 +6,7 @@ bloque con su forma y su textura reales (modelos y texturas del juego y de los m
 - Formas: los «elements» de cada modelo (losas, escaleras, cercas, muebles de los mods), con giros de la variante.
 - Texturas: cada píxel sale de la textura real (16x16); hojas y vidrio dejan ver a través; pasto y hojas teñidos.
 - Rápido con numpy: una zona de 100 x 100 en unos segundos. Corre con prioridad baja para no trabar el juego.
-Solo lee: el .jar de vanilla (%APPDATA%/.minecraft/versions/1.21.1/1.21.1.jar) y los de cliente/mods."""
+Solo lee: el .jar de vanilla (versions/1.21.1/1.21.1.jar dentro de la carpeta .minecraft) y los de cliente/mods."""
 import ctypes
 import glob
 import json
@@ -23,9 +23,30 @@ import numpy as np
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.normpath(os.path.join(AQUI, ".."))
-JAR_VANILLA = os.environ.get("OJO_JAR") or os.path.join(os.environ.get("APPDATA", ""), ".minecraft", "versions", "1.21.1", "1.21.1.jar")
+
+
+def _carpetas_minecraft():
+    """Dónde instala el launcher oficial la carpeta del juego: Windows, Mac y Linux (4-nov: antes solo Windows)."""
+    casa = os.path.expanduser("~")
+    lista = []
+    if os.environ.get("APPDATA"):
+        lista.append(os.path.join(os.environ["APPDATA"], ".minecraft"))
+    lista.append(os.path.join(casa, "Library", "Application Support", "minecraft"))
+    lista.append(os.path.join(casa, ".minecraft"))
+    return lista
+
+
+def buscar_jar():
+    """El .jar de Minecraft 1.21.1: el de OJO_JAR si está puesta; si no, el primero que exista en las carpetas normales."""
+    if os.environ.get("OJO_JAR"):
+        return os.environ["OJO_JAR"]
+    rutas = [os.path.join(c, "versions", "1.21.1", "1.21.1.jar") for c in _carpetas_minecraft()]
+    return next((r for r in rutas if os.path.isfile(r)), rutas[0])
+
+
+JAR_VANILLA = buscar_jar()
 MODS = os.environ.get("OJO_MODS") or os.path.join(RAIZ, "cliente", "mods")
-CACHE = os.path.join(AQUI, "ojo_vista3d_cache.pkl")  # índice de los .jar y geometría ya armada (se rehace sola)
+CACHE = os.environ.get("OJO_CACHE") or os.path.join(AQUI, "ojo_vista3d_cache.pkl")  # índice de los .jar (se rehace solo)
 CIELO_ARRIBA, CIELO_ABAJO = np.array([132, 172, 226], np.float32), np.array([206, 224, 244], np.float32)
 DIRS6 = {"down": (0, -1, 0), "up": (0, 1, 0), "north": (0, 0, -1), "south": (0, 0, 1), "west": (-1, 0, 0), "east": (1, 0, 0)}
 AIRE = {"minecraft:air", "minecraft:cave_air", "minecraft:void_air", "minecraft:light", "minecraft:barrier",

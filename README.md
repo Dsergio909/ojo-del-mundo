@@ -1,4 +1,6 @@
-# Ojo del mundo 👁️
+# Ojo del mundo
+
+[![Pruebas](https://github.com/Dsergio909/ojo-del-mundo/actions/workflows/pruebas.yml/badge.svg)](https://github.com/Dsergio909/ojo-del-mundo/actions/workflows/pruebas.yml)
 
 **Ve un mundo de Minecraft en 3D desde sus archivos, sin abrir el juego.**
 Lo hice para que una IA (Claude) pudiera revisar el pueblo de mi modpack *La Niebla de Herobrine* sin pedirme capturas de pantalla: lee los archivos `.mca` del mundo y dibuja cada bloque con su forma y su textura reales.
@@ -32,6 +34,9 @@ Lo hice para que una IA (Claude) pudiera revisar el pueblo de mi modpack *La Nie
 ![La zona desde las 4 esquinas](imagenes/pueblo_vuelta.png)
 *`--vuelta`: la misma zona desde las 4 esquinas y desde arriba, en una sola imagen.*
 
+![Lago con agua transparente](imagenes/agua_transparente.png)
+*El agua es transparente: se ve el fondo del lago y la orilla.*
+
 ## Qué tan real se ve
 
 Lo calibré con 7 fotos reales del juego (de día, de noche, en una cripta y dentro de una taberna). Los colores se parecen entre un 83 y un 95 %, y de noche el brillo es igual al del juego.
@@ -42,6 +47,7 @@ No copia la niebla, las sombras ni los reflejos de los shaders, y es a propósit
 Necesitas:
 - Python 3.10 o más nuevo y `numpy` (`pip install numpy`).
 - Minecraft Java **1.21.1** instalado. De su `.jar` salen las texturas y los modelos; este repositorio no trae ningún archivo de Mojang.
+  El programa lo busca solo en la carpeta `.minecraft` de Windows, Mac o Linux. Si no lo encuentra, te avisa: sin él, los bloques salen negros y morados.
 
 ```bash
 cd ojo
@@ -64,9 +70,18 @@ python ver_mundo.py --mundo ... --dimension the_nether --x 0 --z 0
 ```
 
 - El giro es el mismo número que muestra el juego con F3: 0 = sur, 90 = oeste, 180 = norte, −90 = este.
-- Si el juego está en otra carpeta: `OJO_JAR=ruta/al/1.21.1.jar`.
+- Si el juego está en otra carpeta: `OJO_JAR=ruta/al/1.21.1.jar`. Si nunca abriste la 1.21.1, ábrela una vez con el launcher para que se descargue.
 - Para ver los bloques de los mods con su textura: `OJO_MODS=ruta/a/la/carpeta/mods`.
 - La primera vez tarda un poco más, porque arma un índice de las texturas (`ojo_vista3d_cache.pkl`). Ese archivo queda solo en tu PC.
+
+### En qué sistemas funciona
+
+- `ver_mundo.py` funciona en Windows, Mac y Linux. Las pruebas automáticas lo corren en Windows y en Linux.
+- El servidor MCP está hecho para Windows: abrir el juego de prueba y sacarle fotos usa PowerShell. Las vistas y el conteo de bloques no dependen de eso.
+
+### Pruebas
+
+`python pruebas/probar.py` arma un mundo pequeño (una casa, una antorcha y un estanque), lee sus bloques, lo dibuja desde 4 ángulos y revisa que el servidor MCP responda con sus 32 herramientas. No necesita Minecraft. GitHub las corre solas en cada cambio.
 
 ### El servidor MCP (para Claude)
 
@@ -93,10 +108,12 @@ Prueba rápida de todas las herramientas de imagen: `python ojo/probar_ojo3d.py`
 | `ojo/ojo_accesos.py` | Busca encierros: sitios a los que uno cae y de los que no puede salir |
 | `ojo/rcon.py` | Comandos al servidor por RCON (la clave se lee de tu `server.properties`) |
 | `ojo/ojo_entrenar.py`, `ojo_prompt.json` | Entrenamiento de las preguntas para revisar fotos con una IA local (Ollama) |
+| `ojo/ojo_ventana.ps1` | Acomoda la ventana del juego de prueba para sacarle fotos (Windows, solo para mi modpack) |
+| `pruebas/` | Mundo de prueba hecho desde cero y las pruebas automáticas |
 
 ---
 
-# Eye of the world 👁️ (English)
+# Eye of the world (English)
 
 **See a Minecraft world in 3D straight from its save files, without opening the game.**
 I built it so an AI (Claude) could review the village of my modpack *La Niebla de Herobrine* without asking me for screenshots. It reads the world's `.mca` files and draws every block with its real shape and texture.
@@ -112,7 +129,7 @@ I built it so an AI (Claude) could review the village of my modpack *La Niebla d
 - **MCP server** with 32 tools, so Claude (or another AI) can see and audit the world.
 
 ## Usage
-Requires Python 3.10+, `numpy` and an installed copy of Minecraft Java **1.21.1**. Textures and models are read from your own game `.jar`; no Mojang files are included here.
+Requires Python 3.10+, `numpy` and an installed copy of Minecraft Java **1.21.1**. Textures and models are read from your own game `.jar`; no Mojang files are included here. It finds the `.jar` in the usual `.minecraft` folder on Windows, Mac or Linux, and warns you if it can't (without it, blocks are drawn black and magenta).
 
 ```bash
 cd ojo
@@ -122,7 +139,9 @@ python ver_mundo.py --mundo "path/to/.minecraft/saves/MyWorld" --x 0 --z 0 --rad
 - Other game folder: `OJO_JAR=path/to/1.21.1.jar`.
 - Modded textures: `OJO_MODS=path/to/mods`.
 
-`ojo/ojo_del_mundo.py` is the full MCP server I use with Claude Code, as is. It is built around my modpack's folder layout. The views, block counting, mobs and text work with any world; the village-plan tools need files that aren't included here, and they tell you when something is missing.
+`ver_mundo.py` runs on Windows, Mac and Linux. `python pruebas/probar.py` builds a tiny world from scratch, reads it, renders it from 4 angles and checks the MCP server's 32 tools, with no Minecraft needed; GitHub runs it on Windows and Linux on every change.
+
+`ojo/ojo_del_mundo.py` is the full MCP server I use with Claude Code, as is, made for Windows. It is built around my modpack's folder layout. The views, block counting, mobs and text work with any world; the village-plan tools need files that aren't included here, and they tell you when something is missing.
 
 ## Licencia / License
 MIT. Hecho por Sergio García ([@Dsergio909](https://github.com/Dsergio909)) con ayuda de Claude.

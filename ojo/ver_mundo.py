@@ -7,8 +7,8 @@ Uso:
     python ver_mundo.py --mundo ... --x 100 --z -40 --camara 100 70 -60 --giro 0 --inclinacion 10   (vista de jugador)
     python ver_mundo.py --mundo ... --x 0 --z 0 --vuelta        (la zona desde las 4 esquinas y desde arriba)
 
-Necesita el .jar de Minecraft 1.21.1 (texturas y modelos). Por defecto lo busca en
-%APPDATA%/.minecraft/versions/1.21.1/1.21.1.jar; otra ruta con la variable OJO_JAR. Mods (sus texturas): OJO_MODS.
+Necesita el .jar de Minecraft 1.21.1 (texturas y modelos). Lo busca solo en la carpeta .minecraft de Windows, Mac
+o Linux (versions/1.21.1/1.21.1.jar); otra ruta con la variable OJO_JAR. Mods (sus texturas): OJO_MODS.
 
 Use any Minecraft Java 1.21 world: read-only, the game does not need to be open."""
 import argparse
@@ -47,6 +47,13 @@ def main():
     region = os.path.join(p.mundo, sub, "region")
     if not os.path.isdir(region):
         sys.exit("No encuentro %s / region folder not found" % region)
+    if not os.path.isfile(V.JAR_VANILLA):
+        print("Ojo: no encuentro Minecraft 1.21.1 en %s.\n"
+              "     Sin ese .jar los bloques salen negros y morados (sin textura). Ábrelo una vez con el launcher en la\n"
+              "     versión 1.21.1, o di dónde está con la variable OJO_JAR.\n"
+              "Note: Minecraft 1.21.1 not found at %s. Without it blocks are drawn black and magenta (no textures).\n"
+              "     Run 1.21.1 once from the launcher, or set OJO_JAR to the .jar path." % (V.JAR_VANILLA, V.JAR_VANILLA),
+              file=sys.stderr)
     m = O.Mundo(region)
     if p.vuelta:
         img, texto = V.vuelta(m, O.decodificar_seccion, p.x, p.z, radio=p.radio, inclinacion=p.inclinacion, noche=p.noche, seres=p.seres)

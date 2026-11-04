@@ -1499,6 +1499,8 @@ def t_comando(comando, confirmar=False):
 
 
 def procesos_prueba():
+    if os.name != "nt":  # 4-nov: el cliente de prueba solo existe en Windows; en Mac o Linux no hay ninguno abierto
+        return []
     r = subprocess.run(["powershell", "-NoProfile", "-Command",
                         "Get-CimInstance Win32_Process -Filter \"Name='javaw.exe'\" | Where-Object { $_.CommandLine -like '*juego_prueba*' -or $_.CommandLine -like '*--username Prueba*' }"
                         " | ForEach-Object { $_.ProcessId }"], capture_output=True, text=True)
