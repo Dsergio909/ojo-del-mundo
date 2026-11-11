@@ -6,7 +6,8 @@ bloque con su forma y su textura reales (modelos y texturas del juego y de los m
 - Formas: los «elements» de cada modelo (losas, escaleras, cercas, muebles de los mods), con giros de la variante.
 - Texturas: cada píxel sale de la textura real (16x16); hojas y vidrio dejan ver a través; pasto y hojas teñidos.
 - Rápido con numpy: una zona de 100 x 100 en unos segundos. Corre con prioridad baja para no trabar el juego.
-Solo lee: el .jar de vanilla (versions/1.21.1/1.21.1.jar dentro de la carpeta .minecraft) y los de cliente/mods."""
+Solo lee: el .jar de vanilla (versions/1.21.1/1.21.1.jar, o la versión más nueva desde la 1.18, dentro de la carpeta
+.minecraft) y los de cliente/mods."""
 import ctypes
 import glob
 import json
@@ -36,12 +37,33 @@ def _carpetas_minecraft():
     return lista
 
 
+def _version_tupla(nombre):
+    """«1.21.1» → (1, 21, 1); None si la carpeta no es una versión normal del juego (snapshots, Forge, Fabric…)."""
+    import re
+    m = re.fullmatch(r"1\.(\d+)(?:\.(\d+))?", nombre)
+    return (1, int(m.group(1)), int(m.group(2) or 0)) if m else None
+
+
 def buscar_jar():
-    """El .jar de Minecraft 1.21.1: el de OJO_JAR si está puesta; si no, el primero que exista en las carpetas normales."""
+    """El .jar del juego (texturas y modelos): el de OJO_JAR si está puesta; si no, la 1.21.1 (la probada) y, si no
+    está, la versión normal más nueva desde la 1.18 que haya instalado el launcher (11-nov: antes solo la 1.21.1)."""
     if os.environ.get("OJO_JAR"):
         return os.environ["OJO_JAR"]
     rutas = [os.path.join(c, "versions", "1.21.1", "1.21.1.jar") for c in _carpetas_minecraft()]
-    return next((r for r in rutas if os.path.isfile(r)), rutas[0])
+    probada = next((r for r in rutas if os.path.isfile(r)), None)
+    if probada:
+        return probada
+    otras = []
+    for c in _carpetas_minecraft():
+        carpeta = os.path.join(c, "versions")
+        if not os.path.isdir(carpeta):
+            continue
+        for nombre in os.listdir(carpeta):
+            v = _version_tupla(nombre)
+            jar = os.path.join(carpeta, nombre, nombre + ".jar")
+            if v and v >= (1, 18, 0) and os.path.isfile(jar):
+                otras.append((v, jar))
+    return max(otras)[1] if otras else rutas[0]
 
 
 JAR_VANILLA = buscar_jar()

@@ -1,149 +1,143 @@
 # Ojo del mundo
 
-[![Pruebas](https://github.com/Dsergio909/ojo-del-mundo/actions/workflows/pruebas.yml/badge.svg)](https://github.com/Dsergio909/ojo-del-mundo/actions/workflows/pruebas.yml)
+[![Tests](https://github.com/Dsergio909/ojo-del-mundo/actions/workflows/pruebas.yml/badge.svg)](https://github.com/Dsergio909/ojo-del-mundo/actions/workflows/pruebas.yml)
+![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-1a5fb4)
+![Minecraft Java 1.18+](https://img.shields.io/badge/Minecraft_Java-1.18%2B-1a5fb4)
+![MCP server](https://img.shields.io/badge/MCP-server-1a5fb4)
+![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey)
 
-**Ve un mundo de Minecraft en 3D desde sus archivos, sin abrir el juego.**
-Lo hice para que una IA (Claude) pudiera revisar el pueblo de mi modpack *La Niebla de Herobrine* sin pedirme capturas de pantalla: lee los archivos `.mca` del mundo y dibuja cada bloque con su forma y su textura reales.
+**See a Minecraft Java world in 3D straight from its save files, without opening the game, and let an AI look at it too.**
+Ojo del mundo (Spanish for "eye of the world") reads the world's `.mca` files and draws every block with its real shape and texture. Its MCP server lets Claude, or any MCP client, open your world, look at it from any angle, count blocks and read signs, so it can help you build without asking you for screenshots.
 
-*English below.*
+*En español más abajo: [ir a la versión en español](#en-español).*
 
-![Vista aérea de 128 bloques](imagenes/aerea_128_bloques.png)
+![Aerial view of 128 blocks, drawn from the save files](imagenes/aerea_128_bloques.png)
 
-## Qué hace
+## What it does
 
-- **Vista 3D de hasta 128 bloques**, desde cualquier ángulo: desde arriba, en perspectiva como un dron, o desde los ojos de un jugador.
-- **Formas reales**: losas, escaleras, cercas, cofres, camas, estandartes con su patrón, cuadros y marcos, y los bloques de los mods (lee sus `.jar`).
-- **Luz del juego**: de día, de noche, dentro de las casas y en cuevas. Las antorchas y los faroles dan luz cálida, y el agua es transparente.
-- **Mobs y aldeanos** en cajas de su tamaño real.
-- **Cuadrícula de coordenadas** sobre el suelo, para contar y ubicar.
-- **Contar bloques** de una zona, medir distancias y leer carteles y libros.
-- **Comparar con una foto real** del juego, para saber cuánto se parece.
-- **Servidor MCP** con 32 herramientas, para que Claude (u otra IA) vea y revise el mundo.
+- **3D views of up to 128 blocks** from any angle: top-down, drone-like perspective, or from a player's eyes.
+- **Real shapes and textures:** slabs, stairs, fences, chests, beds, banners with their patterns, paintings and item frames, plus modded blocks (it reads their `.jar`).
+- **The game's light:** day, night, interiors and caves; torches and lanterns glow warm, water is transparent.
+- **Mobs and villagers** as boxes of their real size, and a coordinate grid on the ground.
+- **Count blocks** in an area, measure distances, and read signs and books.
+- **Read-only and offline:** it never changes your world and never uploads anything.
 
 | | |
 |---|---|
-| ![Castillo en perspectiva](imagenes/castillo_perspectiva.png) | ![Como un jugador en la plaza](imagenes/como_jugador_plaza.png) |
-| Perspectiva tipo dron | Desde los ojos de un jugador |
-| ![Pueblo de noche](imagenes/pueblo_de_noche.png) | ![Cuadrícula de coordenadas](imagenes/pueblo_con_cuadricula.png) |
-| De noche, con la luz de antorchas y faroles | Cuadrícula: rojo = x, azul = z, cada 10 bloques |
-| ![Taberna con camas y cofres](imagenes/taberna_cama_y_cofres.png) | ![Mobs en el castillo](imagenes/castillo_mobs.png) |
-| Interiores: camas, cofres y muebles | Mobs y aldeanos |
-| ![Estandarte y cofre](imagenes/estandarte_y_cofre.png) | ![Cripta con marcos](imagenes/cripta_marcos.png) |
-| Estandartes con su patrón | Cuadros y marcos |
+| ![Castle in perspective](imagenes/castillo_perspectiva.png) | ![From a player's eyes](imagenes/como_jugador_plaza.png) |
+| Drone-like perspective | From a player's eyes |
+| ![Village at night](imagenes/pueblo_de_noche.png) | ![Coordinate grid](imagenes/pueblo_con_cuadricula.png) |
+| At night, lit by torches and lanterns | Coordinate grid: red = x, blue = z |
 
-![La zona desde las 4 esquinas](imagenes/pueblo_vuelta.png)
-*`--vuelta`: la misma zona desde las 4 esquinas y desde arriba, en una sola imagen.*
+## Quick start (3 steps)
 
-![Lago con agua transparente](imagenes/agua_transparente.png)
-*El agua es transparente: se ve el fondo del lago y la orilla.*
+1. **Have Python 3.10+ and Minecraft Java 1.18 or newer** installed. Textures come from your own copy of the game, so open your version once from the launcher.
+2. **Install:**
+   ```bash
+   pip install git+https://github.com/Dsergio909/ojo-del-mundo
+   ```
+3. **Draw your world:**
+   ```bash
+   ojo-view --world "PATH/TO/.minecraft/saves/MyWorld" --x 0 --z 0 --radius 48 --out view.png
+   ```
 
-## Qué tan real se ve
+Where your worlds are: Windows `%APPDATA%\.minecraft\saves`, macOS `~/Library/Application Support/minecraft/saves`, Linux `~/.minecraft/saves`.
 
-Lo calibré con 7 fotos reales del juego (de día, de noche, en una cripta y dentro de una taberna). Los colores se parecen entre un 83 y un 95 %, y de noche el brillo es igual al del juego.
-No copia la niebla, las sombras ni los reflejos de los shaders, y es a propósito: así se ve más lejos y se revisa mejor.
-
-## Cómo se usa
-
-Necesitas:
-- Python 3.10 o más nuevo y `numpy` (`pip install numpy`).
-- Minecraft Java **1.21.1** instalado. De su `.jar` salen las texturas y los modelos; este repositorio no trae ningún archivo de Mojang.
-  El programa lo busca solo en la carpeta `.minecraft` de Windows, Mac o Linux. Si no lo encuentra, te avisa: sin él, los bloques salen negros y morados.
-
+More views:
 ```bash
-cd ojo
-python ver_mundo.py --mundo "C:/Users/TU_USUARIO/AppData/Roaming/.minecraft/saves/MiMundo" --x 0 --z 0 --radio 48 --salida vista.png
+ojo-view --world ... --x 100 --z -40 --projection perspective --yaw 135 --pitch 30   # like a drone photo
+ojo-view --world ... --x 100 --z -40 --camera 100 70 -60 --yaw 0 --pitch 10          # from a player's eyes
+ojo-view --world ... --x 0 --z 0 --night --mobs                                      # night light, mobs marked
+ojo-view --world ... --x 0 --z 0 --around                                            # 4 corners + top in one image
+ojo-view --world ... --dimension the_nether --x 0 --z 0                              # the Nether
+```
+`--yaw` is the same number the game shows with F3: 0 = south, 90 = west, 180 = north, -90 = east.
+
+## Use it with Claude (MCP)
+
+The MCP server gives the AI 14 tools. Add it once:
+
+**Claude Code**
+```bash
+claude mcp add ojo-del-mundo -- uvx --from git+https://github.com/Dsergio909/ojo-del-mundo ojo-mcp --world "PATH/TO/saves/MyWorld"
 ```
 
-Más ejemplos:
-
-```bash
-# perspectiva tipo dron, mirando al noreste
-python ver_mundo.py --mundo ... --x 100 --z -40 --radio 64 --proyeccion perspectiva --giro 225 --inclinacion 35
-# desde los ojos de un jugador parado en (100, 70, -60)
-python ver_mundo.py --mundo ... --x 100 --z -40 --camara 100 71.6 -60 --giro 180 --inclinacion 10
-# de noche, con los mobs y los muebles marcados
-python ver_mundo.py --mundo ... --x 0 --z 0 --noche --seres --muebles
-# la zona desde las 4 esquinas
-python ver_mundo.py --mundo ... --x 0 --z 0 --vuelta
-# el Nether
-python ver_mundo.py --mundo ... --dimension the_nether --x 0 --z 0
-```
-
-- El giro es el mismo número que muestra el juego con F3: 0 = sur, 90 = oeste, 180 = norte, −90 = este.
-- Si el juego está en otra carpeta: `OJO_JAR=ruta/al/1.21.1.jar`. Si nunca abriste la 1.21.1, ábrela una vez con el launcher para que se descargue.
-- Para ver los bloques de los mods con su textura: `OJO_MODS=ruta/a/la/carpeta/mods`.
-- La primera vez tarda un poco más, porque arma un índice de las texturas (`ojo_vista3d_cache.pkl`). Ese archivo queda solo en tu PC.
-
-### En qué sistemas funciona
-
-- `ver_mundo.py` funciona en Windows, Mac y Linux. Las pruebas automáticas lo corren en Windows y en Linux.
-- El servidor MCP está hecho para Windows: abrir el juego de prueba y sacarle fotos usa PowerShell. Las vistas y el conteo de bloques no dependen de eso.
-
-### Pruebas
-
-`python pruebas/probar.py` arma un mundo pequeño (una casa, una antorcha y un estanque), lee sus bloques, lo dibuja desde 4 ángulos y revisa que el servidor MCP responda con sus 32 herramientas. No necesita Minecraft. GitHub las corre solas en cada cambio.
-
-### El servidor MCP (para Claude)
-
-`ojo/ojo_del_mundo.py` es el servidor MCP completo que uso con Claude Code, tal cual. Está pensado para la carpeta de mi modpack:
-- `servidor/` con su `server.properties`, para RCON y para saber qué mundo leer;
-- `planos/` con el plano del pueblo, para las herramientas de casas.
-
-Las vistas, contar bloques, mobs y textos funcionan con cualquier mundo. Algunas herramientas usan módulos de mi modpack que no vienen aquí (planos del pueblo, cliente de prueba para fotos), y esas avisan si les falta algo.
-
+**Claude Desktop** (or any MCP client): add this to its config file.
 ```json
-{ "mcpServers": { "ojo-del-mundo": { "command": "python", "args": ["ruta/a/ojo/ojo_del_mundo.py"] } } }
+{
+  "mcpServers": {
+    "ojo-del-mundo": {
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/Dsergio909/ojo-del-mundo", "ojo-mcp", "--world", "PATH/TO/saves/MyWorld"]
+    }
+  }
+}
 ```
+No `uv`? After `pip install` you can use `"command": "ojo-mcp"` instead. The `--world` part is optional: the AI can open a world later with `open_world`.
 
-Prueba rápida de todas las herramientas de imagen: `python ojo/probar_ojo3d.py`. Usa el mundo de pruebas de mi modpack: es el ejemplo de cómo lo pruebo.
+Then just ask, for example: *"Show me my base at x 120, z -300 from the northeast"*, *"How many diamond blocks are in my vault?"* or *"What do the signs in my village say?"*
 
-## Archivos
-
-| Archivo | Qué es |
+| Tool | What it does |
 |---|---|
-| `ojo/ver_mundo.py` | Programa para ver cualquier mundo desde la terminal |
-| `ojo/ojo_vista3d.py` | El dibujante 3D, hecho con numpy: modelos, texturas, luz, agua, mobs |
-| `ojo/ojo_del_mundo.py` | Servidor MCP (32 herramientas) y lector de bloques y entidades de los `.mca` |
-| `ojo/mapa_aldea.py` | Lector de NBT y de regiones `.mca`, y mapa 2D desde arriba |
-| `ojo/ojo_accesos.py` | Busca encierros: sitios a los que uno cae y de los que no puede salir |
-| `ojo/rcon.py` | Comandos al servidor por RCON (la clave se lee de tu `server.properties`) |
-| `ojo/ojo_entrenar.py`, `ojo_prompt.json` | Entrenamiento de las preguntas para revisar fotos con una IA local (Ollama) |
-| `ojo/ojo_ventana.ps1` | Acomoda la ventana del juego de prueba para sacarle fotos (Windows, solo para mi modpack) |
-| `pruebas/` | Mundo de prueba hecho desde cero y las pruebas automáticas |
+| `open_world` | Opens a world folder; reports its name, Minecraft version, spawn point and dimensions |
+| `world_info` / `use_dimension` | What is open; switch to the Nether or the End |
+| `view_3d` | 3D picture with real textures, any angle, orthographic or perspective, player's-eye camera, night, mobs |
+| `view_around` | The same area from the 4 corners and from above, in one image |
+| `four_views` | Plan, isometric, front and side in one small image, with a legend of block ids |
+| `top_down_map` / `side_section` / `isometric` | Quick maps: from above, a vertical cut, a simple isometric view |
+| `blocks` | The exact blocks around a point, layer by layer, as text |
+| `count_blocks` | How many of each block in an area, its real size, and where a given block is |
+| `measure` | Distance and direction between two points |
+| `read_texts` | What signs and books say in an area |
+| `entities` | Villagers, mobs, animals, paintings, item frames, armor stands and dropped items |
+
+## Versions and limits
+
+- **Tested with Minecraft Java 1.21.1.** It reads worlds saved by **1.18 or newer** (the current chunk format). For textures it uses 1.21.1 if installed, otherwise the newest 1.18+ version your launcher has; set `OJO_JAR` to use a specific client `.jar` (for example from Prism, CurseForge or MultiMC). Versions other than 1.21.1 have not been tested yet: if something looks wrong, please [open an issue](https://github.com/Dsergio909/ojo-del-mundo/issues) with your version.
+- **Not supported:** worlds from before 1.18 (open them once in 1.18+ to convert them) and Bedrock Edition.
+- **How close to the game:** checked against 7 real screenshots (day, night, a crypt and a tavern): colours match 83 to 95 %, and night brightness matches the game. Shader fog, shadows and reflections are left out on purpose so you can see further.
+- **Modded blocks:** set `OJO_MODS` to your `mods` folder to get their textures.
+- **Tool answers are in Spanish for now.** AI clients read them without trouble and answer you in your language; English output is planned.
+- The first run builds a texture index (a few seconds); it and the images are saved in your user cache folder, never next to the code.
+
+## Tests
+
+`python pruebas/probar.py` builds a tiny world from scratch (a house, a torch and a pond), reads its blocks, draws it from 4 angles, checks that both MCP servers start, uses the general one end to end like an AI would, and checks which game `.jar` is picked. No Minecraft needed. GitHub runs it on Windows, macOS and Linux, with Python 3.10 and 3.12.
+
+## Files
+
+| File | What it is |
+|---|---|
+| `ojo/ojo_mcp.py` | The general MCP server (`ojo-mcp`): any world, any OS |
+| `ojo/ver_mundo.py` | The command-line viewer (`ojo-view`) |
+| `ojo/ojo_vista3d.py` | The 3D renderer, written with numpy: models, textures, light, water, mobs |
+| `ojo/mapa_aldea.py` | NBT and `.mca` region reader, top-down map |
+| `ojo/ojo_del_mundo.py` | Block and entity reading, plus the author's original MCP server for his modpack (Windows, RCON, in-game photos, village plans). Kept as is; most people want `ojo_mcp.py` |
+| `ojo/ojo_accesos.py` | Finds traps: spots you can fall into and not climb out of |
+| `ojo/rcon.py`, `ojo/ojo_ventana.ps1`, `ojo/probar_ojo3d.py`, `ojo/ojo_entrenar.py`, `ojo/ojo_prompt.json` | Parts of the author's modpack setup: server commands by RCON, in-game photos on Windows, and question tuning for a local AI (Ollama). Not needed for `ojo-mcp` or `ojo-view` |
+| `pruebas/` | The test world and the automated tests |
 
 ---
 
-# Eye of the world (English)
+# En español
 
-**See a Minecraft world in 3D straight from its save files, without opening the game.**
-I built it so an AI (Claude) could review the village of my modpack *La Niebla de Herobrine* without asking me for screenshots. It reads the world's `.mca` files and draws every block with its real shape and texture.
+**Ve un mundo de Minecraft Java en 3D desde sus archivos, sin abrir el juego, y deja que una IA también lo vea.**
+Lo hice para que Claude revisara el pueblo de mi modpack *La Niebla de Herobrine* sin pedirme capturas. Lee los archivos `.mca` del mundo y dibuja cada bloque con su forma y su textura reales.
 
-## Features
-- **3D view of up to 128 blocks** from any angle: top-down, drone-like perspective, or player's eyes.
-- **Real shapes**: slabs, stairs, fences, chests, beds, banners with their patterns, paintings, item frames and modded blocks (it reads their `.jar`).
-- **Game lighting**: day, night, interiors and caves. Torches and lanterns give warm light, and the water is transparent.
-- **Mobs and villagers** as boxes of their real size.
-- **Coordinate grid** on the ground (red = x, blue = z, every 10 blocks).
-- **Count blocks** in an area, measure distances, and read signs and books.
-- **Compare against a real screenshot** to measure how close the render is. Calibrated with 7 real photos: 83–95 % colour match, and the same brightness as the game at night. Shader fog, shadows and reflections are left out on purpose, to see further.
-- **MCP server** with 32 tools, so Claude (or another AI) can see and audit the world.
+**En 3 pasos:**
+1. Ten Python 3.10 o más nuevo y Minecraft Java 1.18 o más nuevo (ábrelo una vez con el launcher: de ahí salen las texturas).
+2. Instala: `pip install git+https://github.com/Dsergio909/ojo-del-mundo`
+3. Dibuja tu mundo: `ojo-view --mundo "RUTA/.minecraft/saves/MiMundo" --x 0 --z 0 --radio 48 --salida vista.png` (también sirven los nombres en inglés).
 
-## Usage
-Requires Python 3.10+, `numpy` and an installed copy of Minecraft Java **1.21.1**. Textures and models are read from your own game `.jar`; no Mojang files are included here. It finds the `.jar` in the usual `.minecraft` folder on Windows, Mac or Linux, and warns you if it can't (without it, blocks are drawn black and magenta).
+**Con Claude:** `claude mcp add ojo-del-mundo -- uvx --from git+https://github.com/Dsergio909/ojo-del-mundo ojo-mcp --world "RUTA/saves/MiMundo"`. El servidor trae 14 herramientas: abrir el mundo, vistas 3D, contar bloques, medir, leer carteles y ver entidades. Todo es de solo lectura y nada sale de tu computador.
 
-```bash
-cd ojo
-python ver_mundo.py --mundo "path/to/.minecraft/saves/MyWorld" --x 0 --z 0 --radio 48 --salida view.png
-```
-(The option is `--radio`; `--giro` is the in-game yaw, `--inclinacion` the pitch, `--camara X Y Z` puts the camera at a point.)
-- Other game folder: `OJO_JAR=path/to/1.21.1.jar`.
-- Modded textures: `OJO_MODS=path/to/mods`.
+**Versiones:** probado con la 1.21.1; lee mundos guardados desde la 1.18. Para las texturas usa la 1.21.1 si la tienes y, si no, la versión más nueva desde la 1.18 que haya instalado el launcher (otra ruta: `OJO_JAR`; mods: `OJO_MODS`). No sirve con mundos de antes de la 1.18 ni con Bedrock.
 
-`ver_mundo.py` runs on Windows, Mac and Linux. `python pruebas/probar.py` builds a tiny world from scratch, reads it, renders it from 4 angles and checks the MCP server's 32 tools, with no Minecraft needed; GitHub runs it on Windows and Linux on every change.
+**Qué tan real se ve:** lo calibré con 7 fotos reales del juego. Los colores se parecen entre un 83 y un 95 %, y de noche el brillo es igual. No copia la niebla ni las sombras de los shaders, a propósito, para ver más lejos.
 
-`ojo/ojo_del_mundo.py` is the full MCP server I use with Claude Code, as is, made for Windows. It is built around my modpack's folder layout. The views, block counting, mobs and text work with any world; the village-plan tools need files that aren't included here, and they tell you when something is missing.
+**Pruebas:** `python pruebas/probar.py` arma un mundo pequeño desde cero y revisa la lectura, las vistas, que arranquen los dos servidores MCP, usa el general como lo haría una IA y revisa la elección del `.jar`. GitHub las corre en Windows, Mac y Linux.
 
-## Licencia / License
-MIT. Hecho por Sergio García ([@Dsergio909](https://github.com/Dsergio909)) con ayuda de Claude.
-Minecraft es una marca de Mojang / Microsoft. Este proyecto no es oficial y no tiene relación con ellos.
-*Minecraft is a trademark of Mojang / Microsoft. This is an unofficial project, not affiliated with them.*
+## License / Licencia
+
+MIT. Made by Sergio García ([@Dsergio909](https://github.com/Dsergio909)) with help from Claude.
+Minecraft is a trademark of Mojang / Microsoft. This is an unofficial project, not affiliated with them. No Mojang files are included: textures and models are read from your own copy of the game.

@@ -4,3 +4,7 @@ __pycache__/
 ojo_vista3d_cache.pkl
 *.npy
 vista*.png
+# lo que deja pip install .
+build/
+*.egg-info/
+view.png

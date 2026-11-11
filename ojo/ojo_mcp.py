@@ -1,0 +1,337 @@
+# -*- coding: utf-8 -*-
+"""Ojo del mundo: general MCP server. Lets an AI (Claude, or any MCP client) see and measure ANY Minecraft Java
+world from its save files, without opening the game. Works on Windows, macOS and Linux. Read-only.
+
+Run:
+    ojo-mcp --world "/path/to/.minecraft/saves/MyWorld"        (after pip install)
+    python ojo/ojo_mcp.py --world "/path/to/saves/MyWorld"      (from a clone)
+The world can also come from the OJO_WORLD environment variable, or be chosen later with the open_world tool.
+
+This file only adds a clean, world-agnostic front door. The heavy lifting (reading .mca files, the 3D renderer)
+lives in ojo_del_mundo.py, mapa_aldea.py and ojo_vista3d.py. The modpack-specific server (RCON, test client photos,
+village plans) is ojo_del_mundo.py itself and is not exposed here."""
+import argparse
+import gzip
+import json
+import os
+import sys
+
+AQUI = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, AQUI)
+
+VERSION = "1.1.0"
+DIMENSIONES = {"overworld": "", "the_nether": "DIM-1", "the_end": "DIM1"}
+# DataVersion of the first release that uses the current chunk format («sections» + «block_states»): 1.18
+DATA_VERSION_MIN = 2860
+NOMBRES_VERSION = [(4189, "1.21.4"), (4082, "1.21.3"), (3955, "1.21.1"), (3953, "1.21"), (3839, "1.20.6"),
+                   (3700, "1.20.4"), (3465, "1.20.1"), (3463, "1.20"), (3337, "1.19.4"), (3120, "1.19.2"),
+                   (3105, "1.19"), (2975, "1.18.2"), (2865, "1.18.1"), (2860, "1.18")]
+
+
+import rutas  # noqa: E402
+
+CACHE_DIR = rutas.preparar()
+
+import ojo_del_mundo as O  # noqa: E402  (after OJO_CACHE is set)
+import mapa_aldea as MA  # noqa: E402
+
+ESTADO = {"mundo": None, "dimension": "overworld"}
+
+
+def _region():
+    if not ESTADO["mundo"]:
+        raise RuntimeError("No world open yet. Call open_world with the folder that has level.dat "
+                           "(for example .minecraft/saves/MyWorld), or start the server with --world.")
+    return os.path.join(ESTADO["mundo"], DIMENSIONES[ESTADO["dimension"]], "region")
+
+
+# The core functions read the world through these three hooks: point them at the chosen world, never at a modpack.
+O.carpeta_region = _region
+O.guardar_mundo = lambda: None          # no RCON here: we read what the game last saved
+O.SALIDA = os.path.join(CACHE_DIR, "images")
+
+
+def nombre_version(dv):
+    for d, n in NOMBRES_VERSION:
+        if dv >= d:
+            return n if dv == d else n + "+" if d == NOMBRES_VERSION[0][0] else "about " + n
+    return "older than 1.18"
+
+
+def leer_level_dat(mundo):
+    """Name, version, spawn and last played from level.dat (gzip NBT). Empty dict if it can't be read."""
+    ruta = os.path.join(mundo, "level.dat")
+    try:
+        raiz = MA.leer_nbt(gzip.decompress(open(ruta, "rb").read()))
+    except Exception:
+        return {}
+    data = raiz.get("Data", raiz)
+    ver = data.get("Version") or {}
+    return {"name": data.get("LevelName"), "data_version": data.get("DataVersion") or ver.get("Id"),
+            "version": ver.get("Name"), "spawn": (data.get("SpawnX"), data.get("SpawnY"), data.get("SpawnZ"))}
+
+
+def describir_mundo():
+    m = ESTADO["mundo"]
+    info = leer_level_dat(m)
+    regiones = {d: len([f for f in os.listdir(os.path.join(m, s, "region")) if f.endswith(".mca")])
+                for d, s in DIMENSIONES.items() if os.path.isdir(os.path.join(m, s, "region"))}
+    lin = ["World: %s" % (info.get("name") or os.path.basename(os.path.normpath(m))), "Folder: %s" % m]
+    dv = info.get("data_version")
+    if dv:
+        lin.append("Minecraft version: %s (DataVersion %s)" % (info.get("version") or nombre_version(dv), dv))
+        if dv < DATA_VERSION_MIN:
+            lin.append("WARNING: this world was saved by a version older than 1.18. Its chunks use an older format "
+                       "that Ojo del mundo cannot read yet. Open it once in 1.18 or newer to convert it.")
+    else:
+        lin.append("Minecraft version: unknown (level.dat could not be read)")
+    if info.get("spawn") and None not in info["spawn"]:
+        lin.append("Spawn: x %s, y %s, z %s (a good place to start looking)" % info["spawn"])
+    lin.append("Dimensions with saved chunks: %s" % (", ".join("%s (%d region files)" % kv for kv in regiones.items()) or "none"))
+    lin.append("Reading now: %s" % ESTADO["dimension"])
+    try:
+        import ojo_vista3d as V
+        lin.append("Textures: %s" % (V.JAR_VANILLA if os.path.isfile(V.JAR_VANILLA) else
+                                     "Minecraft .jar NOT found: 3D views will draw black and magenta blocks. Install the game "
+                                     "version once with the launcher, or set OJO_JAR to a client .jar."))
+    except Exception as e:  # numpy missing, etc.
+        lin.append("3D views unavailable: %s" % e)
+    lin.append("Note: tool answers are written in Spanish for now; you can reply to the user in any language.")
+    return "\n".join(lin)
+
+
+# --- tools ------------------------------------------------------------------------------------------------------
+
+
+def t_open_world(path, dimension="overworld"):
+    ruta = os.path.abspath(os.path.expanduser(str(path).strip().strip('"')))
+    if os.path.isfile(ruta) and os.path.basename(ruta) == "level.dat":
+        ruta = os.path.dirname(ruta)
+    if dimension not in DIMENSIONES:
+        return "Unknown dimension %r. Use overworld, the_nether or the_end." % dimension
+    if not os.path.isdir(os.path.join(ruta, DIMENSIONES[dimension], "region")):
+        return ("No %s folder with region files in %s. Give the world folder: the one that has level.dat and a "
+                "region folder (for example .minecraft/saves/MyWorld)." % (os.path.join(DIMENSIONES[dimension], "region") or "region", ruta))
+    ESTADO["mundo"], ESTADO["dimension"] = ruta, dimension
+    return describir_mundo()
+
+
+def t_world_info():
+    if not ESTADO["mundo"]:
+        return "No world open yet. Call open_world first."
+    return describir_mundo()
+
+
+def _zona(x, z, radius, x1, z1, x2, z2, maximo):
+    if None not in (x1, z1, x2, z2):
+        return int(x1), int(z1), int(x2), int(z2)
+    if x is None or z is None:
+        raise ValueError("Give an area: x1, z1, x2, z2, or x, z and radius.")
+    r = max(1, min(int(radius or 32), maximo))
+    return int(x) - r, int(z) - r, int(x) + r, int(z) + r
+
+
+def t_blocks(x, y, z, radius=2):
+    return O.t_bloques(int(x), int(y), int(z), radius)
+
+
+def t_top_down_map(x1, z1, x2, z2, scale=2):
+    return O.t_vista_cenital(int(x1), int(z1), int(x2), int(z2), escala=scale)
+
+
+def t_side_section(x1, z1, x2, z2, y_min=None, y_max=None, scale=5):
+    return O.t_corte_lateral(int(x1), int(z1), int(x2), int(z2), y_min=y_min, y_max=y_max, escala=scale)
+
+
+def t_isometric(x1, z1, x2, z2, y_min=None, y_max=None, from_corner="southeast", size=4):
+    return O.t_isometrica(int(x1), int(z1), int(x2), int(z2), y_min=y_min, y_max=y_max, desde=ESQUINAS[from_corner], tam=size)
+
+
+ESQUINAS = {"southeast": "sureste", "southwest": "suroeste", "northwest": "noroeste", "northeast": "noreste"}
+RUMBOS = {"north": "norte", "northeast": "noreste", "east": "este", "southeast": "sureste", "south": "sur",
+          "southwest": "suroeste", "west": "oeste", "northwest": "noroeste"}
+
+
+def t_view_3d(x, z, radius=48, y=None, from_direction="southeast", yaw=None, pitch=35, projection="orthographic",
+              distance=None, night=False, no_leaves=False, mobs=False, y_min=None, y_max=None, width=1100, height=760,
+              marks=None, grid=True, camera_x=None, camera_y=None, camera_z=None, fov=70):
+    return O.t_vista_3d(x=int(x), z=int(z), y=y, radio=max(4, min(int(radius), 64)), desde=RUMBOS[from_direction], giro=yaw,
+                        inclinacion=pitch, proyeccion="perspectiva" if projection == "perspective" else "orto",
+                        distancia=distance, noche=night, sin_hojas=no_leaves, seres=mobs, y_min=y_min, y_max=y_max,
+                        ancho=width, alto=height, marcas=marks, cuadricula=grid, camara_x=camera_x, camara_y=camera_y,
+                        camara_z=camera_z, fov=fov)
+
+
+def t_view_around(x, z, radius=48, pitch=35, night=False, no_leaves=False, mobs=False, y_max=None, include_top=True, width=1500):
+    return O.t_vista_vuelta(x=int(x), z=int(z), radio=max(4, min(int(radius), 64)), inclinacion=pitch, noche=night,
+                            sin_hojas=no_leaves, seres=mobs, y_max=y_max, con_arriba=include_top, ancho=width)
+
+
+def t_four_views(x1, y1, z1, x2, y2, z2, size=None, from_corner="southeast", mark_entities=True):
+    return O.t_planos(int(x1), int(y1), int(z1), int(x2), int(y2), int(z2), tam=size, desde=ESQUINAS[from_corner],
+                      marcar_entidades=mark_entities)
+
+
+def t_count_blocks(x1=None, z1=None, x2=None, z2=None, y1=None, y2=None, x=None, z=None, radius=None, find=None, max_list=40):
+    if None in (x1, z1, x2, z2) and (x is None or z is None or radius is None):
+        return "Give an area: x1, z1, x2, z2 (optionally y1, y2), or x, z and radius."
+    return O.t_contar_bloques(x1=x1, y1=y1, z1=z1, x2=x2, y2=y2, z2=z2, x=x, z=z, radio=radius, buscar=find, max_lista=max_list)
+
+
+def t_measure(x1, y1, z1, x2, y2, z2):
+    return O.t_medir(int(x1), int(y1), int(z1), int(x2), int(y2), int(z2))
+
+
+def t_read_texts(x=None, z=None, radius=None, x1=None, z1=None, x2=None, z2=None, full=False):
+    a, b, c, d = _zona(x, z, radius, x1, z1, x2, z2, 300)
+    return O.t_leer_textos(x1=a, z1=b, x2=c, z2=d, completo=full)
+
+
+TIPOS_SERES = ["aldeano", "cuadro", "marco", "armadura", "monstruo", "animal", "objeto", "vehiculo", "display", "otro"]
+SERES_EN = dict(zip(["villager", "painting", "item_frame", "armor_stand", "monster", "animal", "item", "vehicle", "display", "other"],
+                    TIPOS_SERES))
+
+
+def t_entities(x=None, z=None, radius=None, x1=None, z1=None, x2=None, z2=None, kinds=None):
+    a, b, c, d = _zona(x, z, radius, x1, z1, x2, z2, 320)
+    return O.t_seres(x1=a, z1=b, x2=c, z2=d, tipos=[SERES_EN[k] for k in kinds] if kinds else None)
+
+
+def t_use_dimension(dimension="overworld"):
+    if not ESTADO["mundo"]:
+        return "No world open yet. Call open_world first."
+    return t_open_world(ESTADO["mundo"], dimension)
+
+
+I = {"type": "integer"}
+N = {"type": "number"}
+B = {"type": "boolean"}
+S = {"type": "string"}
+CORNER = {"type": "string", "enum": list(ESQUINAS)}
+AREA = {"x": I, "z": I, "radius": I, "x1": I, "z1": I, "x2": I, "z2": I}
+
+HERRAMIENTAS = [
+    ("open_world", "Open a Minecraft Java world folder (the one with level.dat, e.g. .minecraft/saves/MyWorld). Read-only. "
+     "Returns its name, version, spawn point and which dimensions have chunks. Call this first.",
+     {"path": S, "dimension": {"type": "string", "enum": list(DIMENSIONES)}}, ["path"], t_open_world),
+    ("world_info", "Which world and dimension are open, the Minecraft version, the spawn point and whether textures were found.",
+     {}, [], t_world_info),
+    ("use_dimension", "Switch the open world to overworld, the_nether or the_end.",
+     {"dimension": {"type": "string", "enum": list(DIMENSIONES)}}, ["dimension"], t_use_dimension),
+    ("view_3d", "A 3D picture of the world as in the game, drawn from the save files with each block's real shape and texture "
+     "(vanilla and mods). Up to 129 x 129 blocks (radius up to 64). Any angle: from_direction or yaw, pitch 0-90 (90 = top-down); "
+     "orthographic (to measure) or perspective (like a drone photo). camera_x/y/z puts the camera where a player would stand. "
+     "night=true uses the saved light, no_leaves hides tree leaves, mobs marks mobs and villagers, y_max cuts roofs to look "
+     "inside, marks = [[x,y,z],...] in red. 2 to 6 s.",
+     {"x": I, "z": I, "radius": I, "y": I, "from_direction": {"type": "string", "enum": list(RUMBOS)}, "yaw": N, "pitch": N,
+      "projection": {"type": "string", "enum": ["orthographic", "perspective"]}, "distance": N, "night": B, "no_leaves": B,
+      "mobs": B, "y_min": I, "y_max": I, "width": I, "height": I, "marks": {"type": "array", "items": {"type": "array", "items": I}},
+      "grid": B, "camera_x": N, "camera_y": N, "camera_z": N, "fov": N}, ["x", "z"], t_view_3d),
+    ("view_around", "The same area from the 4 corners and from above, in ONE image: see something from every side for the cost "
+     "of one picture. About 7 s.",
+     {"x": I, "z": I, "radius": I, "pitch": N, "night": B, "no_leaves": B, "mobs": B, "y_max": I, "include_top": B, "width": I},
+     ["x", "z"], t_view_around),
+    ("four_views", "ONE small image with 4 drawings of an area (up to 100 x 80 x 100): plan, isometric, front and side, with "
+     "coordinates every 5 blocks, a colour per block, mod blocks outlined and a numbered legend with each block id. Cheap in tokens.",
+     {"x1": I, "y1": I, "z1": I, "x2": I, "y2": I, "z2": I, "size": I, "from_corner": CORNER, "mark_entities": B},
+     ["x1", "y1", "z1", "x2", "y2", "z2"], t_four_views),
+    ("top_down_map", "Flat map seen from above, one colour per block.", {"x1": I, "z1": I, "x2": I, "z2": I, "scale": I},
+     ["x1", "z1", "x2", "z2"], t_top_down_map),
+    ("side_section", "Vertical cut along a line from (x1, z1) to (x2, z2): what is underground and how tall things are.",
+     {"x1": I, "z1": I, "x2": I, "z2": I, "y_min": I, "y_max": I, "scale": I}, ["x1", "z1", "x2", "z2"], t_side_section),
+    ("isometric", "Simple isometric block view of an area up to 96 x 96, fast and without textures.",
+     {"x1": I, "z1": I, "x2": I, "z2": I, "y_min": I, "y_max": I, "from_corner": CORNER, "size": I},
+     ["x1", "z1", "x2", "z2"], t_isometric),
+    ("blocks", "The exact blocks around a point (radius up to 5), layer by layer as text.",
+     {"x": I, "y": I, "z": I, "radius": I}, ["x", "y", "z"], t_blocks),
+    ("count_blocks", "COUNT the blocks in an area: how many of each type, how many are not air, and the real length, width and "
+     "height of what is there. find = part of a block name, or several separated by commas (e.g. 'lantern,torch'), to list where "
+     "each one is. Up to 25 million positions.",
+     {"x1": I, "y1": I, "z1": I, "x2": I, "y2": I, "z2": I, "x": I, "z": I, "radius": I, "find": S, "max_list": I}, [],
+     t_count_blocks),
+    ("measure", "Distance in blocks between two points: straight line, along the ground and walking on the grid, plus direction.",
+     {"x1": I, "y1": I, "z1": I, "x2": I, "y2": I, "z2": I}, ["x1", "y1", "z1", "x2", "y2", "z2"], t_measure),
+    ("read_texts", "What the signs say (front and back), and the books on lecterns or inside chests and barrels in an area: "
+     "title, author and pages (the first one, or all with full=true).",
+     dict(AREA, full=B), [], t_read_texts),
+    ("entities", "Saved entities in an area: villagers with name and job, paintings, item frames and what they hold, armor "
+     "stands, mobs, animals, dropped items and vehicles.",
+     dict(AREA, kinds={"type": "array", "items": {"type": "string", "enum": list(SERES_EN)}}), [], t_entities),
+]
+FUNCIONES = {h[0]: h[4] for h in HERRAMIENTAS}
+
+
+def llamar(nombre, args):
+    if nombre not in FUNCIONES:
+        raise ValueError("unknown tool: %s" % nombre)
+    if not ESTADO["mundo"] and nombre not in ("open_world", "world_info", "measure"):
+        return [{"type": "text", "text": "No world open yet. Call open_world with the folder that has level.dat "
+                                         "(for example .minecraft/saves/MyWorld), then try %s again." % nombre}]
+    res = FUNCIONES[nombre](**(args or {}))
+    texto, ruta = res if isinstance(res, tuple) else (res, None)
+    contenido = [{"type": "text", "text": texto}]
+    if ruta:
+        contenido.append({"type": "image", "data": O.png_base64(ruta), "mimeType": "image/png"})
+    return contenido
+
+
+def responder(salida, msg):
+    salida.write((json.dumps(msg, ensure_ascii=False) + "\n").encode("utf-8"))
+    salida.flush()
+
+
+def servir():
+    salida = sys.stdout.buffer
+    sys.stdout = sys.stderr  # stray prints go to stderr and never break the protocol
+    for linea in sys.stdin.buffer:
+        if not linea.strip():
+            continue
+        try:
+            msg = json.loads(linea.decode("utf-8"))
+        except ValueError:
+            continue
+        mid, metodo = msg.get("id"), msg.get("method")
+        if mid is None:
+            continue  # notifications
+        try:
+            if metodo == "initialize":
+                version = (msg.get("params") or {}).get("protocolVersion") or "2025-06-18"
+                res = {"protocolVersion": version, "capabilities": {"tools": {}},
+                       "serverInfo": {"name": "ojo-del-mundo", "version": VERSION},
+                       "instructions": "Read-only views of a Minecraft Java world from its save files. Start with open_world "
+                                       "(unless a world was given at startup), then world_info, view_3d, count_blocks..."}
+            elif metodo == "ping":
+                res = {}
+            elif metodo == "tools/list":
+                res = {"tools": [{"name": n, "description": d, "inputSchema": {"type": "object", "properties": p, "required": r}}
+                                 for n, d, p, r, _ in HERRAMIENTAS]}
+            elif metodo == "tools/call":
+                p = msg.get("params") or {}
+                try:
+                    res = {"content": llamar(p.get("name"), p.get("arguments")), "isError": False}
+                except Exception as e:
+                    res = {"content": [{"type": "text", "text": "Error in %s: %s: %s" % (p.get("name"), type(e).__name__, e)}],
+                           "isError": True}
+            else:
+                responder(salida, {"jsonrpc": "2.0", "id": mid, "error": {"code": -32601, "message": "unknown method: %s" % metodo}})
+                continue
+            responder(salida, {"jsonrpc": "2.0", "id": mid, "result": res})
+        except Exception as e:
+            responder(salida, {"jsonrpc": "2.0", "id": mid, "error": {"code": -32603, "message": str(e)}})
+
+
+def main(argv=None):
+    a = argparse.ArgumentParser(prog="ojo-mcp", description="Ojo del mundo MCP server: see any Minecraft Java world from its files.")
+    a.add_argument("--world", default=os.environ.get("OJO_WORLD"), help="world folder (the one with level.dat)")
+    a.add_argument("--dimension", default="overworld", choices=list(DIMENSIONES))
+    a.add_argument("--version", action="version", version="ojo-del-mundo " + VERSION)
+    p = a.parse_args(argv)
+    if p.world:
+        aviso = t_open_world(p.world, p.dimension)
+        if not ESTADO["mundo"]:
+            print(aviso, file=sys.stderr)  # keep serving: the client can still call open_world with another path
+    servir()
+
+
+if __name__ == "__main__":
+    main()

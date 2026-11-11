@@ -9,6 +9,7 @@ Qué tiene:
 
 Uso: python mundo_prueba.py CARPETA
 """
+import gzip
 import os
 import struct
 import sys
@@ -110,7 +111,11 @@ def crear(destino):
             sector += n
     with open(os.path.join(destino, "region", "r.0.0.mca"), "wb") as f:
         f.write(bytes(cabecera) + bytes(cuerpo))
-    open(os.path.join(destino, "level.dat"), "wb").close()
+    datos = {"LevelName": (8, "Ojo test world"), "DataVersion": (3, DATA_VERSION),
+             "Version": (10, {"Id": (3, DATA_VERSION), "Name": (8, "1.21.1")}),
+             "SpawnX": (3, 7), "SpawnY": (3, 65), "SpawnZ": (3, 7)}
+    with open(os.path.join(destino, "level.dat"), "wb") as f:  # como el del juego: NBT comprimido con gzip
+        f.write(gzip.compress(b"\x0a" + _nombre("") + _valor(10, {"Data": (10, datos)})))
     return destino
 
 

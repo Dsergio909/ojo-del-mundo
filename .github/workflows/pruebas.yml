@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
         python: ["3.10", "3.12"]
     runs-on: ${{ matrix.os }}
     steps:
@@ -24,3 +24,8 @@ jobs:
       - run: python pruebas/probar.py
         env:
           PYTHONIOENCODING: utf-8
+      - name: Se instala con pip y los comandos arrancan
+        run: |
+          pip install .
+          ojo-mcp --version
+          ojo-view --help
