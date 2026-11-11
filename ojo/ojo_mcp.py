@@ -36,12 +36,17 @@ import ojo_del_mundo as O  # noqa: E402  (after OJO_CACHE is set)
 import mapa_aldea as MA  # noqa: E402
 
 ESTADO = {"mundo": None, "dimension": "overworld"}
+SIN_MUNDO = ("No world open yet. Call open_world with the folder that has level.dat "
+             "(for example .minecraft/saves/MyWorld), or start the server with --world.")
+
+
+class ErrorDeUso(Exception):
+    """Algo que el cliente puede arreglar (ruta mala, mundo sin abrir): se muestra solo el mensaje, como error."""
 
 
 def _region():
     if not ESTADO["mundo"]:
-        raise RuntimeError("No world open yet. Call open_world with the folder that has level.dat "
-                           "(for example .minecraft/saves/MyWorld), or start the server with --world.")
+        raise ErrorDeUso(SIN_MUNDO)
     return os.path.join(ESTADO["mundo"], DIMENSIONES[ESTADO["dimension"]], "region")
 
 
@@ -107,79 +112,159 @@ def t_open_world(path, dimension="overworld"):
     ruta = os.path.abspath(os.path.expanduser(str(path).strip().strip('"')))
     if os.path.isfile(ruta) and os.path.basename(ruta) == "level.dat":
         ruta = os.path.dirname(ruta)
-    if dimension not in DIMENSIONES:
-        return "Unknown dimension %r. Use overworld, the_nether or the_end." % dimension
+    if os.path.basename(ruta) == "region":  # dieron la carpeta region: subir a la del mundo
+        ruta = os.path.dirname(ruta)
+    if os.path.basename(ruta) in ("DIM-1", "DIM1"):  # dieron la carpeta de una dimensión
+        ruta = os.path.dirname(ruta)
+    if not isinstance(dimension, str) or dimension not in DIMENSIONES:
+        raise ErrorDeUso("Unknown dimension %r. Use overworld, the_nether or the_end." % (dimension,))
     if not os.path.isdir(os.path.join(ruta, DIMENSIONES[dimension], "region")):
-        return ("No %s folder with region files in %s. Give the world folder: the one that has level.dat and a "
-                "region folder (for example .minecraft/saves/MyWorld)." % (os.path.join(DIMENSIONES[dimension], "region") or "region", ruta))
+        raise ErrorDeUso("No %s folder with region files in %s. Give the world folder: the one that has level.dat and a "
+                         "region folder (for example .minecraft/saves/MyWorld)." % (os.path.join(DIMENSIONES[dimension], "region") or "region", ruta))
     ESTADO["mundo"], ESTADO["dimension"] = ruta, dimension
     return describir_mundo()
 
 
 def t_world_info():
     if not ESTADO["mundo"]:
-        return "No world open yet. Call open_world first."
+        raise ErrorDeUso("No world open yet. Call open_world first.")
     return describir_mundo()
 
 
+def _entero(v, nombre):
+    """12, 12.0 o "12" -> 12; cualquier otra cosa: ValueError en inglés."""
+    if isinstance(v, bool):
+        raise ValueError("%s must be an integer" % nombre)
+    if isinstance(v, int):
+        return v
+    try:
+        f = float(v.strip() if isinstance(v, str) else v)
+        if f == f and abs(f) != float("inf") and f == int(f):
+            return int(f)
+    except (TypeError, ValueError):
+        pass
+    raise ValueError("%s must be an integer (got %r)" % (nombre, v))
+
+
+def _numero(v, nombre):
+    """12, 12.5 o "12.5" -> float; cualquier otra cosa: ValueError en inglés."""
+    if isinstance(v, bool):
+        raise ValueError("%s must be a number" % nombre)
+    try:
+        f = float(v.strip() if isinstance(v, str) else v)
+        if f == f and abs(f) != float("inf"):
+            return f
+    except (TypeError, ValueError):
+        pass
+    raise ValueError("%s must be a number (got %r)" % (nombre, v))
+
+
+def _opcion(v, tabla, nombre):
+    """Una de las claves de tabla (sin importar mayúsculas); si no, ValueError que lista las válidas."""
+    if isinstance(v, str) and v.strip().lower() in tabla:
+        return v.strip().lower()
+    raise ValueError("%s must be one of: %s" % (nombre, ", ".join(tabla)))
+
+
+def _opc(f, v, nombre):
+    """Como f, pero None (argumento que no se dio) se queda None."""
+    return None if v is None else f(v, nombre)
+
+
 def _zona(x, z, radius, x1, z1, x2, z2, maximo):
-    if None not in (x1, z1, x2, z2):
-        return int(x1), int(z1), int(x2), int(z2)
+    if None not in (x1, z1, x2, z2):  # la caja completa manda: se ignoran x, z y radius
+        return _entero(x1, "x1"), _entero(z1, "z1"), _entero(x2, "x2"), _entero(z2, "z2")
     if x is None or z is None:
         raise ValueError("Give an area: x1, z1, x2, z2, or x, z and radius.")
-    r = max(1, min(int(radius or 32), maximo))
-    return int(x) - r, int(z) - r, int(x) + r, int(z) + r
+    r = max(1, min(_entero(32 if radius is None else radius, "radius"), maximo))
+    x, z = _entero(x, "x"), _entero(z, "z")
+    return x - r, z - r, x + r, z + r
 
 
 def t_blocks(x, y, z, radius=2):
-    return O.t_bloques(int(x), int(y), int(z), radius)
+    return O.t_bloques(_entero(x, "x"), _entero(y, "y"), _entero(z, "z"), _entero(radius, "radius"))
 
 
 def t_top_down_map(x1, z1, x2, z2, scale=2):
-    return O.t_vista_cenital(int(x1), int(z1), int(x2), int(z2), escala=scale)
+    return O.t_vista_cenital(_entero(x1, "x1"), _entero(z1, "z1"), _entero(x2, "x2"), _entero(z2, "z2"),
+                             escala=_entero(scale, "scale"))
 
 
 def t_side_section(x1, z1, x2, z2, y_min=None, y_max=None, scale=5):
-    return O.t_corte_lateral(int(x1), int(z1), int(x2), int(z2), y_min=y_min, y_max=y_max, escala=scale)
+    y_min, y_max = _opc(_entero, y_min, "y_min"), _opc(_entero, y_max, "y_max")
+    if None not in (y_min, y_max) and y_min > y_max:
+        y_min, y_max = y_max, y_min
+    return O.t_corte_lateral(_entero(x1, "x1"), _entero(z1, "z1"), _entero(x2, "x2"), _entero(z2, "z2"),
+                             y_min=y_min, y_max=y_max, escala=_entero(scale, "scale"))
 
 
 def t_isometric(x1, z1, x2, z2, y_min=None, y_max=None, from_corner="southeast", size=4):
-    return O.t_isometrica(int(x1), int(z1), int(x2), int(z2), y_min=y_min, y_max=y_max, desde=ESQUINAS[from_corner], tam=size)
+    return O.t_isometrica(_entero(x1, "x1"), _entero(z1, "z1"), _entero(x2, "x2"), _entero(z2, "z2"),
+                          y_min=_opc(_entero, y_min, "y_min"), y_max=_opc(_entero, y_max, "y_max"),
+                          desde=ESQUINAS[_opcion(from_corner, ESQUINAS, "from_corner")], tam=_entero(size, "size"))
 
 
 ESQUINAS = {"southeast": "sureste", "southwest": "suroeste", "northwest": "noroeste", "northeast": "noreste"}
 RUMBOS = {"north": "norte", "northeast": "noreste", "east": "este", "southeast": "sureste", "south": "sur",
           "southwest": "suroeste", "west": "oeste", "northwest": "noroeste"}
+PROYECCIONES = ["orthographic", "perspective"]
+
+
+def _marcas(marks):
+    if marks is None:
+        return None
+    if not isinstance(marks, list) or not all(isinstance(m, (list, tuple)) and len(m) == 3 for m in marks):
+        raise ValueError("marks must be a list of [x, y, z] triples, for example [[10, 64, 20], [12, 65, 22]]")
+    return [tuple(_numero(c, "marks") for c in m) for m in marks]
 
 
 def t_view_3d(x, z, radius=48, y=None, from_direction="southeast", yaw=None, pitch=35, projection="orthographic",
               distance=None, night=False, no_leaves=False, mobs=False, y_min=None, y_max=None, width=1100, height=760,
               marks=None, grid=True, camera_x=None, camera_y=None, camera_z=None, fov=70):
-    return O.t_vista_3d(x=int(x), z=int(z), y=y, radio=max(4, min(int(radius), 64)), desde=RUMBOS[from_direction], giro=yaw,
-                        inclinacion=pitch, proyeccion="perspectiva" if projection == "perspective" else "orto",
-                        distancia=distance, noche=night, sin_hojas=no_leaves, seres=mobs, y_min=y_min, y_max=y_max,
-                        ancho=width, alto=height, marcas=marks, cuadricula=grid, camara_x=camera_x, camara_y=camera_y,
-                        camara_z=camera_z, fov=fov)
+    cam = [camera_x, camera_y, camera_z]
+    if any(c is not None for c in cam) and any(c is None for c in cam):
+        raise ValueError("camera_x, camera_y and camera_z must be given together (all three or none)")
+    return O.t_vista_3d(x=_entero(x, "x"), z=_entero(z, "z"), y=_opc(_entero, y, "y"),
+                        radio=max(4, min(_entero(radius, "radius"), 64)),
+                        desde=RUMBOS[_opcion(from_direction, RUMBOS, "from_direction")], giro=_opc(_numero, yaw, "yaw"),
+                        inclinacion=_numero(pitch, "pitch"),
+                        proyeccion="perspectiva" if _opcion(projection, PROYECCIONES, "projection") == "perspective" else "orto",
+                        distancia=_opc(_numero, distance, "distance"), noche=night, sin_hojas=no_leaves, seres=mobs,
+                        y_min=_opc(_entero, y_min, "y_min"), y_max=_opc(_entero, y_max, "y_max"),
+                        ancho=_entero(width, "width"), alto=_entero(height, "height"), marcas=_marcas(marks), cuadricula=grid,
+                        camara_x=_opc(_numero, camera_x, "camera_x"), camara_y=_opc(_numero, camera_y, "camera_y"),
+                        camara_z=_opc(_numero, camera_z, "camera_z"), fov=_numero(fov, "fov"))
 
 
 def t_view_around(x, z, radius=48, pitch=35, night=False, no_leaves=False, mobs=False, y_max=None, include_top=True, width=1500):
-    return O.t_vista_vuelta(x=int(x), z=int(z), radio=max(4, min(int(radius), 64)), inclinacion=pitch, noche=night,
-                            sin_hojas=no_leaves, seres=mobs, y_max=y_max, con_arriba=include_top, ancho=width)
+    return O.t_vista_vuelta(x=_entero(x, "x"), z=_entero(z, "z"), radio=max(4, min(_entero(radius, "radius"), 64)),
+                            inclinacion=_numero(pitch, "pitch"), noche=night, sin_hojas=no_leaves, seres=mobs,
+                            y_max=_opc(_entero, y_max, "y_max"), con_arriba=include_top, ancho=_entero(width, "width"))
 
 
 def t_four_views(x1, y1, z1, x2, y2, z2, size=None, from_corner="southeast", mark_entities=True):
-    return O.t_planos(int(x1), int(y1), int(z1), int(x2), int(y2), int(z2), tam=size, desde=ESQUINAS[from_corner],
-                      marcar_entidades=mark_entities)
+    return O.t_planos(_entero(x1, "x1"), _entero(y1, "y1"), _entero(z1, "z1"), _entero(x2, "x2"), _entero(y2, "y2"),
+                      _entero(z2, "z2"), tam=_opc(_entero, size, "size"),
+                      desde=ESQUINAS[_opcion(from_corner, ESQUINAS, "from_corner")], marcar_entidades=mark_entities)
 
 
 def t_count_blocks(x1=None, z1=None, x2=None, z2=None, y1=None, y2=None, x=None, z=None, radius=None, find=None, max_list=40):
-    if None in (x1, z1, x2, z2) and (x is None or z is None or radius is None):
-        return "Give an area: x1, z1, x2, z2 (optionally y1, y2), or x, z and radius."
-    return O.t_contar_bloques(x1=x1, y1=y1, z1=z1, x2=x2, y2=y2, z2=z2, x=x, z=z, radio=radius, buscar=find, max_lista=max_list)
+    y1, y2 = _opc(_entero, y1, "y1"), _opc(_entero, y2, "y2")
+    ayuda = "Give an area: x1, z1, x2, z2 (optionally y1, y2), or x, z and radius."
+    if None not in (x1, z1, x2, z2):  # la caja completa manda: se ignoran x, z y radius
+        return O.t_contar_bloques(x1=_entero(x1, "x1"), y1=y1, z1=_entero(z1, "z1"), x2=_entero(x2, "x2"), y2=y2,
+                                  z2=_entero(z2, "z2"), buscar=find, max_lista=_entero(max_list, "max_list"))
+    if x is None or z is None:
+        raise ErrorDeUso(ayuda + (" radius needs x and z." if radius is not None else ""))
+    # x, z sin radio: 32 por defecto, como read_texts y entities
+    return O.t_contar_bloques(y1=y1, y2=y2, x=_entero(x, "x"), z=_entero(z, "z"),
+                              radio=_entero(32 if radius is None else radius, "radius"), buscar=find,
+                              max_lista=_entero(max_list, "max_list"))
 
 
 def t_measure(x1, y1, z1, x2, y2, z2):
-    return O.t_medir(int(x1), int(y1), int(z1), int(x2), int(y2), int(z2))
+    return O.t_medir(_entero(x1, "x1"), _entero(y1, "y1"), _entero(z1, "z1"), _entero(x2, "x2"), _entero(y2, "y2"),
+                     _entero(z2, "z2"))
 
 
 def t_read_texts(x=None, z=None, radius=None, x1=None, z1=None, x2=None, z2=None, full=False):
@@ -194,12 +279,16 @@ SERES_EN = dict(zip(["villager", "painting", "item_frame", "armor_stand", "monst
 
 def t_entities(x=None, z=None, radius=None, x1=None, z1=None, x2=None, z2=None, kinds=None):
     a, b, c, d = _zona(x, z, radius, x1, z1, x2, z2, 320)
-    return O.t_seres(x1=a, z1=b, x2=c, z2=d, tipos=[SERES_EN[k] for k in kinds] if kinds else None)
+    if isinstance(kinds, str):
+        kinds = [kinds]
+    if kinds is not None and not isinstance(kinds, list):
+        raise ValueError("kinds must be a string or a list of: %s" % ", ".join(SERES_EN))
+    return O.t_seres(x1=a, z1=b, x2=c, z2=d, tipos=[SERES_EN[_opcion(k, SERES_EN, "kinds")] for k in kinds] if kinds else None)
 
 
 def t_use_dimension(dimension="overworld"):
     if not ESTADO["mundo"]:
-        return "No world open yet. Call open_world first."
+        raise ErrorDeUso("No world open yet. Call open_world first.")
     return t_open_world(ESTADO["mundo"], dimension)
 
 
@@ -259,15 +348,25 @@ HERRAMIENTAS = [
      dict(AREA, kinds={"type": "array", "items": {"type": "string", "enum": list(SERES_EN)}}), [], t_entities),
 ]
 FUNCIONES = {h[0]: h[4] for h in HERRAMIENTAS}
+PROPIEDADES = {h[0]: h[2] for h in HERRAMIENTAS}
+TITULOS = {"open_world": "Open world", "world_info": "World info", "use_dimension": "Switch dimension", "view_3d": "3D view",
+           "view_around": "View from all sides", "four_views": "Four views", "top_down_map": "Top-down map",
+           "side_section": "Side section", "isometric": "Isometric view", "blocks": "Blocks around a point",
+           "count_blocks": "Count blocks", "measure": "Measure distance", "read_texts": "Read signs and books",
+           "entities": "Entities"}
 
 
 def llamar(nombre, args):
     if nombre not in FUNCIONES:
         raise ValueError("unknown tool: %s" % nombre)
+    args = args or {}
+    for k in args:
+        if k not in PROPIEDADES[nombre]:
+            raise ValueError("unknown argument %r for %s" % (k, nombre))
     if not ESTADO["mundo"] and nombre not in ("open_world", "world_info", "measure"):
-        return [{"type": "text", "text": "No world open yet. Call open_world with the folder that has level.dat "
-                                         "(for example .minecraft/saves/MyWorld), then try %s again." % nombre}]
-    res = FUNCIONES[nombre](**(args or {}))
+        raise ErrorDeUso("No world open yet. Call open_world with the folder that has level.dat "
+                         "(for example .minecraft/saves/MyWorld), then try %s again." % nombre)
+    res = FUNCIONES[nombre](**args)
     texto, ruta = res if isinstance(res, tuple) else (res, None)
     contenido = [{"type": "text", "text": texto}]
     if ruta:
@@ -280,6 +379,13 @@ def responder(salida, msg):
     salida.flush()
 
 
+def _error(salida, mid, codigo, mensaje):
+    responder(salida, {"jsonrpc": "2.0", "id": mid, "error": {"code": codigo, "message": mensaje}})
+
+
+VERSIONES_PROTOCOLO = ("2025-06-18", "2025-03-26", "2024-11-05")
+
+
 def servir():
     salida = sys.stdout.buffer
     sys.stdout = sys.stderr  # stray prints go to stderr and never break the protocol
@@ -290,12 +396,19 @@ def servir():
             msg = json.loads(linea.decode("utf-8"))
         except ValueError:
             continue
+        if not isinstance(msg, dict):
+            _error(salida, None, -32600, "invalid request: a JSON-RPC message must be an object")
+            continue
         mid, metodo = msg.get("id"), msg.get("method")
         if mid is None:
             continue  # notifications
+        if "method" not in msg:
+            continue  # a response from the client: nothing to answer
         try:
+            params = msg.get("params")
             if metodo == "initialize":
-                version = (msg.get("params") or {}).get("protocolVersion") or "2025-06-18"
+                pedida = params.get("protocolVersion") if isinstance(params, dict) else None
+                version = pedida if isinstance(pedida, str) and pedida in VERSIONES_PROTOCOLO else VERSIONES_PROTOCOLO[0]
                 res = {"protocolVersion": version, "capabilities": {"tools": {}},
                        "serverInfo": {"name": "ojo-del-mundo", "version": VERSION},
                        "instructions": "Read-only views of a Minecraft Java world from its save files. Start with open_world "
@@ -303,21 +416,31 @@ def servir():
             elif metodo == "ping":
                 res = {}
             elif metodo == "tools/list":
-                res = {"tools": [{"name": n, "description": d, "inputSchema": {"type": "object", "properties": p, "required": r}}
+                res = {"tools": [{"name": n, "title": TITULOS[n], "description": d,
+                                  "inputSchema": {"type": "object", "properties": p, "required": r},
+                                  "annotations": {"readOnlyHint": True, "openWorldHint": False}}
                                  for n, d, p, r, _ in HERRAMIENTAS]}
             elif metodo == "tools/call":
-                p = msg.get("params") or {}
+                if params is None:
+                    params = {}
+                if not isinstance(params, dict) or not isinstance(params.get("name"), str) \
+                        or not (params.get("arguments") is None or isinstance(params.get("arguments"), dict)):
+                    _error(salida, mid, -32602, "invalid params: tools/call needs a name (string) and arguments (object)")
+                    continue
                 try:
-                    res = {"content": llamar(p.get("name"), p.get("arguments")), "isError": False}
+                    res = {"content": llamar(params["name"], params.get("arguments")), "isError": False}
+                except (ErrorDeUso, ValueError) as e:
+                    res = {"content": [{"type": "text", "text": str(e) if isinstance(e, ErrorDeUso)
+                                        else "Error in %s: %s" % (params["name"], e)}], "isError": True}
                 except Exception as e:
-                    res = {"content": [{"type": "text", "text": "Error in %s: %s: %s" % (p.get("name"), type(e).__name__, e)}],
+                    res = {"content": [{"type": "text", "text": "Error in %s: %s: %s" % (params["name"], type(e).__name__, e)}],
                            "isError": True}
             else:
-                responder(salida, {"jsonrpc": "2.0", "id": mid, "error": {"code": -32601, "message": "unknown method: %s" % metodo}})
+                _error(salida, mid, -32601, "unknown method: %s" % metodo)
                 continue
             responder(salida, {"jsonrpc": "2.0", "id": mid, "result": res})
         except Exception as e:
-            responder(salida, {"jsonrpc": "2.0", "id": mid, "error": {"code": -32603, "message": str(e)}})
+            _error(salida, mid, -32603, str(e))
 
 
 def main(argv=None):
@@ -327,9 +450,10 @@ def main(argv=None):
     a.add_argument("--version", action="version", version="ojo-del-mundo " + VERSION)
     p = a.parse_args(argv)
     if p.world:
-        aviso = t_open_world(p.world, p.dimension)
-        if not ESTADO["mundo"]:
-            print(aviso, file=sys.stderr)  # keep serving: the client can still call open_world with another path
+        try:
+            t_open_world(p.world, p.dimension)
+        except ErrorDeUso as e:
+            print(e, file=sys.stderr)  # keep serving: the client can still call open_world with another path
     servir()
 
 

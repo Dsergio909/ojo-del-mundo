@@ -27,6 +27,11 @@ PROYECCION = {"orto": "orto", "orthographic": "orto", "perspectiva": "perspectiv
 
 
 def main(argv=None):
+    for flujo in (sys.stdout, sys.stderr):  # sin esto, PYTHONIOENCODING=cp1252 hace fallar la flecha de los textos
+        try:
+            flujo.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
     a = argparse.ArgumentParser(prog="ojo-view", description="3D view of a Minecraft Java world from its files / "
                                 "vista 3D de un mundo de Minecraft desde sus archivos")
     a.add_argument("--world", "--mundo", dest="mundo", metavar="PATH", required=True, help="world folder (the one with level.dat) / carpeta del mundo")
@@ -70,6 +75,8 @@ def main(argv=None):
                              camara_en=tuple(p.camara) if p.camara else None, fov=p.fov)
     if img is None:
         sys.exit(texto)
+    carpeta_salida = os.path.dirname(os.path.abspath(p.salida))
+    os.makedirs(carpeta_salida, exist_ok=True)
     V.escribir_png(p.salida, img)
     print(texto if isinstance(texto, str) else "")
     print("Image / imagen:", os.path.abspath(p.salida))

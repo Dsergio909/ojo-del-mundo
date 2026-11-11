@@ -73,6 +73,8 @@ claude mcp add ojo-del-mundo -- uvx --from git+https://github.com/Dsergio909/ojo
   }
 }
 ```
+On **Windows**, write the path with forward slashes (`C:/Users/...`) or with double backslashes (`C:\\Users\\...`). To find the config file, open Claude Desktop and go to **Settings > Developer > Edit Config**.
+
 No `uv`? After `pip install` you can use `"command": "ojo-mcp"` instead. The `--world` part is optional: the AI can open a world later with `open_world`.
 
 Then just ask, for example: *"Show me my base at x 120, z -300 from the northeast"*, *"How many diamond blocks are in my vault?"* or *"What do the signs in my village say?"*
@@ -91,6 +93,17 @@ Then just ask, for example: *"Show me my base at x 120, z -300 from the northeas
 | `read_texts` | What signs and books say in an area |
 | `entities` | Villagers, mobs, animals, paintings, item frames, armor stands and dropped items |
 
+![A village drawn from four corners and from above](imagenes/pueblo_vuelta.png)
+*What `view_around` returns: the same area from the 4 corners and from above.*
+
+## Security and privacy
+
+- **Read-only:** it never changes your world.
+- **No network access:** `ojo-mcp` and `ojo-view` do not connect to the internet or to any server.
+- **What it reads:** the world folder you give it, and your own game `.jar`.
+- **What it writes:** only images and a texture index, in your user cache folder.
+- **`open_world`:** through this tool the AI can open any world folder your user account can read.
+
 ## Versions and limits
 
 - **Tested with Minecraft Java 1.21.1.** It reads worlds saved by **1.18 or newer** (the current chunk format). For textures it uses 1.21.1 if installed, otherwise the newest 1.18+ version your launcher has; set `OJO_JAR` to use a specific client `.jar` (for example from Prism, CurseForge or MultiMC). Versions other than 1.21.1 have not been tested yet: if something looks wrong, please [open an issue](https://github.com/Dsergio909/ojo-del-mundo/issues) with your version.
@@ -99,6 +112,13 @@ Then just ask, for example: *"Show me my base at x 120, z -300 from the northeas
 - **Modded blocks:** set `OJO_MODS` to your `mods` folder to get their textures.
 - **Tool answers are in Spanish for now.** AI clients read them without trouble and answer you in your language; English output is planned.
 - The first run builds a texture index (a few seconds); it and the images are saved in your user cache folder, never next to the code.
+
+## Troubleshooting
+
+- **Blocks are drawn black and magenta:** the game `.jar` was not found. Open your version once from the launcher, or set `OJO_JAR` to a client `.jar`.
+- **"No hay chunks generados":** that area was never generated. Check the coordinates with F3.
+- **`ojo-mcp` not found:** Python's Scripts folder is not on your PATH. Use `python -m ojo` instead, also in the JSON: `"command": "python", "args": ["-m", "ojo", "--world", "PATH/TO/saves/MyWorld"]`.
+- **Recent changes do not show:** the game is open. Save and quit to title, or wait for the autosave, to see them.
 
 ## Tests
 
@@ -114,8 +134,9 @@ Then just ask, for example: *"Show me my base at x 120, z -300 from the northeas
 | `ojo/mapa_aldea.py` | NBT and `.mca` region reader, top-down map |
 | `ojo/ojo_del_mundo.py` | Block and entity reading, plus the author's original MCP server for his modpack (Windows, RCON, in-game photos, village plans). Kept as is; most people want `ojo_mcp.py` |
 | `ojo/ojo_accesos.py` | Finds traps: spots you can fall into and not climb out of |
-| `ojo/rcon.py`, `ojo/ojo_ventana.ps1`, `ojo/probar_ojo3d.py`, `ojo/ojo_entrenar.py`, `ojo/ojo_prompt.json` | Parts of the author's modpack setup: server commands by RCON, in-game photos on Windows, and question tuning for a local AI (Ollama). Not needed for `ojo-mcp` or `ojo-view` |
 | `pruebas/` | The test world and the automated tests |
+
+**Author's modpack extras** (not used by `ojo-mcp` or `ojo-view`): `ojo/rcon.py`, `ojo/ojo_ventana.ps1`, `ojo/probar_ojo3d.py`, `ojo/ojo_entrenar.py`, `ojo/ojo_prompt.json`: server commands by RCON, in-game photos on Windows, and question tuning for a local AI (Ollama).
 
 ---
 
@@ -130,6 +151,10 @@ Lo hice para que Claude revisara el pueblo de mi modpack *La Niebla de Herobrine
 3. Dibuja tu mundo: `ojo-view --mundo "RUTA/.minecraft/saves/MiMundo" --x 0 --z 0 --radio 48 --salida vista.png` (también sirven los nombres en inglés).
 
 **Con Claude:** `claude mcp add ojo-del-mundo -- uvx --from git+https://github.com/Dsergio909/ojo-del-mundo ojo-mcp --world "RUTA/saves/MiMundo"`. El servidor trae 14 herramientas: abrir el mundo, vistas 3D, contar bloques, medir, leer carteles y ver entidades. Todo es de solo lectura y nada sale de tu computador.
+
+**Privacidad:** solo lectura, sin internet, y solo escribe en la carpeta de caché.
+
+Si `ojo-mcp` no aparece, usa `python -m ojo`.
 
 **Versiones:** probado con la 1.21.1; lee mundos guardados desde la 1.18. Para las texturas usa la 1.21.1 si la tienes y, si no, la versión más nueva desde la 1.18 que haya instalado el launcher (otra ruta: `OJO_JAR`; mods: `OJO_MODS`). No sirve con mundos de antes de la 1.18 ni con Bedrock.
 

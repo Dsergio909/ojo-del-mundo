@@ -2077,13 +2077,22 @@ def t_contar_bloques(x1=None, y1=None, z1=None, x2=None, y2=None, z2=None, casa=
             x2 - x1 + 1, z2 - z1 + 1)
     if "DIM-1" in m.g.carpeta and (y1 is None or y2 is None):  # Nether: el techo de piedra base engaña; todo el alto de adentro
         y1, y2 = (0 if y1 is None else y1), (127 if y2 is None else y2)
-    if y1 is None or y2 is None:  # alto: del terreno más bajo al techo más alto de la zona
-        tops = [m.tope(a, b)[1] for a in range(x1, x2 + 1, 2) for b in range(z1, z2 + 1, 2)]
-        suelos = [m.suelo(a, b)[1] for a in range(x1, x2 + 1, 2) for b in range(z1, z2 + 1, 2)]
-        tops, suelos = [t for t in tops if t is not None], [t for t in suelos if t is not None]
+    auto_y = y1 is None or y2 is None
+    if auto_y:  # alto: del terreno natural más bajo al techo más alto de la zona
+        cols = [(a, b) for a in range(x1, x2 + 1, 2) for b in range(z1, z2 + 1, 2)]
+        tops = [t for t in (m.tope(a, b)[1] for a, b in cols) if t is not None]
         if not tops:
             return "No hay chunks generados en esa zona."
-        y1 = (min(suelos) - 3) if y1 is None else y1
+        piso = max(tops) - 64  # tope: no bajar más de 64 bloques bajo el techo más alto
+
+        def _natural(a, b):  # baja por aire y bloques construidos (techos, pisos, muebles) hasta tierra o piedra
+            nom, y = m.tope(a, b)
+            while y is not None and y > piso and nom is not None and nom not in NATURAL:
+                y -= 1
+                nom = m.bloque(a, y, b)
+            return y
+        suelos = [t for t in (_natural(a, b) for a, b in cols) if t is not None]
+        y1 = (max(min(suelos), piso) - 3) if y1 is None else y1
         y2 = (max(tops)) if y2 is None else y2
     y1, y2 = min(y1, y2), max(y1, y2)
     celdas = (x2 - x1 + 1) * (y2 - y1 + 1) * (z2 - z1 + 1)
@@ -2105,6 +2114,9 @@ def t_contar_bloques(x1=None, y1=None, z1=None, x2=None, y2=None, z2=None, casa=
         lin.append("Lo que hay ocupa de x %d a %d, de y %d a %d y de z %d a %d: %d de largo (este-oeste), %d de ancho (norte-sur) "
                    "y %d de alto." % (a[0] + x1, b[0] + x1, a[1] + y1, b[1] + y1, a[2] + z1, b[2] + z1, b[0] - a[0] + 1,
                                       b[2] - a[2] + 1, b[1] - a[1] + 1))
+    if auto_y:
+        lin.append("La altura (y %d..%d) se eligió sola, del terreno natural al techo más alto de la zona; si buscas algo más "
+                   "arriba o más abajo, fíjala con y1 e y2." % (y1, y2))
     lin.append("\nDe cada tipo (de más a menos):")
     orden = sorted(por.items(), key=lambda t: -t[1])
     max_lista = max(5, int(max_lista))

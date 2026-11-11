@@ -29,19 +29,25 @@ RAIZ = os.path.normpath(os.path.join(AQUI, ".."))
 def _carpetas_minecraft():
     """Dónde instala el launcher oficial la carpeta del juego: Windows, Mac y Linux (4-nov: antes solo Windows)."""
     casa = os.path.expanduser("~")
-    lista = []
-    if os.environ.get("APPDATA"):
-        lista.append(os.path.join(os.environ["APPDATA"], ".minecraft"))
-    lista.append(os.path.join(casa, "Library", "Application Support", "minecraft"))
-    lista.append(os.path.join(casa, ".minecraft"))
-    return lista
+    win = [os.path.join(os.environ["APPDATA"], ".minecraft")] if os.environ.get("APPDATA") else []
+    mac = [os.path.join(casa, "Library", "Application Support", "minecraft")]
+    lin = [os.path.join(casa, ".minecraft")]
+    # la de este sistema primero: así el aviso de «jar no encontrado» muestra una ruta que existe en tu PC
+    if sys.platform.startswith("win"):
+        return win + lin + mac
+    if sys.platform == "darwin":
+        return mac + win + lin
+    return lin + win + mac
 
 
 def _version_tupla(nombre):
-    """«1.21.1» → (1, 21, 1); None si la carpeta no es una versión normal del juego (snapshots, Forge, Fabric…)."""
+    """«1.21.1» → (1, 21, 1), «26.1» → (26, 1, 0); None si la carpeta no es una versión normal del juego (snapshots, Forge, Fabric…)."""
     import re
     m = re.fullmatch(r"1\.(\d+)(?:\.(\d+))?", nombre)
-    return (1, int(m.group(1)), int(m.group(2) or 0)) if m else None
+    if m:
+        return (1, int(m.group(1)), int(m.group(2) or 0))
+    m = re.fullmatch(r"(\d{2})\.(\d+)(?:\.(\d+))?", nombre)  # numeración por año: 26.1, 26.1.2
+    return (int(m.group(1)), int(m.group(2)), int(m.group(3) or 0)) if m and int(m.group(1)) >= 25 else None
 
 
 def buscar_jar():

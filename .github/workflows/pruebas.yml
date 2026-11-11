@@ -29,3 +29,11 @@ jobs:
           pip install .
           ojo-mcp --version
           ojo-view --help
+      - name: Dibuja el mundo de prueba (sin PYTHONIOENCODING, como lo usa la gente)
+        shell: bash
+        run: |
+          python pruebas/mundo_prueba.py mundo_ci
+          ojo-view --world mundo_ci --x 12 --z 12 --radius 8 --out v.png > salida.txt
+          test -s v.png
+          cat salida.txt
+          (cd "$RUNNER_TEMP" && python -m ojo --version)

@@ -98,9 +98,20 @@ with tempfile.TemporaryDirectory() as tmp:
                 ("tools/call", {"name": "view_3d", "arguments": {"x": 12, "z": 12, "radius": 16, "width": 400, "height": 300}}),
                 ("tools/call", {"name": "measure", "arguments": {"x1": 0, "y1": 64, "z1": 0, "x2": 3, "y2": 64, "z2": 4}}),
                 ("tools/call", {"name": "use_dimension", "arguments": {"dimension": "the_nether"}}),
-                ("tools/call", {"name": "no_existe", "arguments": {}})]
+                ("tools/call", {"name": "no_existe", "arguments": {}}),
+                ("tools/call", {"name": "count_blocks", "arguments": {"x": 7, "z": 7, "radius": 3, "find": "torch"}}),  # 10
+                ("initialize", {"protocolVersion": "1999-01-01"}),                                                       # 11
+                ("tools/call", {"name": "view_3d", "arguments": {"x": 7, "z": 7, "from_direction": "up"}}),             # 12
+                ("tools/call", {"name": "count_blocks", "arguments": {"x1": 0, "z1": 0, "x2": 31, "z2": 31, "y1": 60,
+                                                                       "y2": 70, "x": 500, "z": 500, "radius": 2}}),     # 13
+                ("tools/call", {"name": "open_world", "arguments": {"path": os.path.join(tmp, "no_hay_mundo")}}),        # 14
+                ("tools/call", {"name": "view_3d", "arguments": {"x": 7, "z": 7, "bogus": 1}}),                          # 15
+                ("tools/call", {"name": "count_blocks", "arguments": {"x": "7", "z": 7.0, "radius": 2, "y1": 60, "y2": 70}}),  # 16
+                ("tools/call", {"name": "count_blocks", "arguments": {"radius": 3}}),                                    # 17
+                ("tools/call", {"name": "entities", "arguments": {"x": 7, "z": 7, "kinds": "villager"}})]                # 18
     entrada = "".join(json.dumps({"jsonrpc": "2.0", "id": i + 1, "method": m, "params": p}) + "\n"
                       for i, (m, p) in enumerate(llamadas))
+    entrada = "[1]\n" + entrada + json.dumps({"jsonrpc": "2.0", "id": 99, "method": "ping"}) + "\n"
     r = subprocess.run([sys.executable, os.path.join(OJO, "ojo_mcp.py")], input=entrada, capture_output=True, text=True,
                        encoding="utf-8", cwd=tmp, timeout=300, env=entorno)
     res = {}
@@ -114,7 +125,7 @@ with tempfile.TemporaryDirectory() as tmp:
     nombres = [h["name"] for h in res.get(2, {}).get("tools") or []]
     revisar("tiene 14 herramientas con nombre en inglés", len(nombres) == 14 and "open_world" in nombres and "view_3d" in nombres,
             str(nombres))
-    revisar("sin mundo abierto pide open_world (y no se cae)", "open_world" in texto(3) and res.get(3, {}).get("isError") is False, texto(3)[:150])
+    revisar("sin mundo abierto pide open_world (y no se cae)", "open_world" in texto(3) and res.get(3, {}).get("isError") is True, texto(3)[:150])
     revisar("open_world lee level.dat: nombre, versión 1.21.1 y spawn",
             "Ojo test world" in texto(4) and "1.21.1" in texto(4) and "Spawn: x 7" in texto(4), texto(4)[:300])
     revisar("count_blocks encuentra la antorcha en (7, 65, 7)", "(7, 65, 7) torch" in texto(5), texto(5)[-300:])
@@ -123,11 +134,25 @@ with tempfile.TemporaryDirectory() as tmp:
     revisar("measure: 5 bloques en línea recta", "en línea recta 5.0 bloques" in texto(7), texto(7)[:150])
     revisar("use_dimension sin Nether avisa y no cambia de mundo", "DIM-1" in texto(8), texto(8)[:150])
     revisar("herramienta desconocida devuelve error sin caerse", res.get(9, {}).get("isError") is True, str(res.get(9))[:150])
+    revisar("la línea [1] no tumba el servidor (un ping posterior responde)", res.get(99) == {} and 99 in res, r.stderr[-200:])
+    revisar("protocolVersion desconocida se negocia a 2025-06-18", res.get(11, {}).get("protocolVersion") == "2025-06-18")
+    revisar("view_3d con from_direction «up» es error y lista las válidas",
+            res.get(12, {}).get("isError") is True and "north" in texto(12), texto(12)[:150])
+    revisar("count_blocks sin y1/y2 baja del techo y encuentra la antorcha en (7, 65, 7)",
+            "(7, 65, 7)" in texto(10) and "torch" in texto(10) and "se eligió sola" in texto(10), texto(10)[-300:])
+    revisar("count_blocks con caja y radius cuenta la caja", "x 0..31" in texto(13) and res.get(13, {}).get("isError") is False, texto(13)[:150])
+    revisar("open_world a una ruta que no existe es error", res.get(14, {}).get("isError") is True, texto(14)[:150])
+    revisar("argumento desconocido es error", res.get(15, {}).get("isError") is True and "unknown argument 'bogus'" in texto(15), texto(15)[:150])
+    revisar("count_blocks acepta \"7\" y 7.0", res.get(16, {}).get("isError") is False and "x 5..9" in texto(16), texto(16)[:150])
+    revisar("count_blocks con radius sin x y z avisa y no usa otro lugar", "Give an area" in texto(17), texto(17)[:150])
+    revisar("kinds como texto no da KeyError", res.get(18, {}).get("isError") is False, texto(18)[:150])
+    revisar("todas las herramientas son de solo lectura con título",
+            all((h.get("annotations") or {}).get("readOnlyHint") is True and h.get("title") for h in res.get(2, {}).get("tools") or []))
 
 print("5. Elegir el .jar del juego")
 import importlib  # noqa: E402
 with tempfile.TemporaryDirectory() as casa:
-    for v in ["1.20.4", "1.21.3", "1.19.2", "24w10a", "1.16.5", "fabric-loader-1.21"]:
+    for v in ["1.20.4", "1.21.3", "1.19.2", "24w10a", "1.16.5", "fabric-loader-1.21", "26.1", "26.1.2", "26.1-snapshot-3"]:
         os.makedirs(os.path.join(casa, ".minecraft", "versions", v))
         open(os.path.join(casa, ".minecraft", "versions", v, v + ".jar"), "w").close()
     antes = {k: os.environ.get(k) for k in ("HOME", "APPDATA", "OJO_JAR", "USERPROFILE")}
@@ -136,7 +161,8 @@ with tempfile.TemporaryDirectory() as casa:
         os.environ.pop(k, None)
     import ojo_vista3d as V  # noqa: E402
     elegido = V.buscar_jar()
-    revisar("sin la 1.21.1 elige la versión más nueva desde la 1.18 (1.21.3)", elegido.endswith(os.path.join("1.21.3", "1.21.3.jar")), elegido)
+    revisar("sin la 1.21.1 elige la versión más nueva, también la numeración por año (26.1.2)", elegido.endswith(os.path.join("26.1.2", "26.1.2.jar")), elegido)
+    revisar("la carpeta del sistema va primero (Linux: ~/.minecraft)", sys.platform != "linux" or V._carpetas_minecraft()[0] == os.path.join(casa, ".minecraft"))
     os.makedirs(os.path.join(casa, ".minecraft", "versions", "1.21.1"))
     open(os.path.join(casa, ".minecraft", "versions", "1.21.1", "1.21.1.jar"), "w").close()
     elegido = V.buscar_jar()

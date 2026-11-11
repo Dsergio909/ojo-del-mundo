@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,13 +8,12 @@ version = "1.1.0"
 description = "See a Minecraft Java world in 3D from its save files, and let Claude (or any MCP client) look at it, count blocks and read signs."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = "MIT"
 authors = [{ name = "Sergio García" }]
 dependencies = ["numpy>=1.24"]
 keywords = ["minecraft", "mcp", "model-context-protocol", "claude", "renderer", "anvil", "nbt", "ai-tools"]
 classifiers = [
   "Programming Language :: Python :: 3",
-  "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
   "Topic :: Games/Entertainment",
   "Topic :: Multimedia :: Graphics :: 3D Rendering",
